@@ -1,6 +1,6 @@
 [package]
 name = "gcs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Switch Git identity profiles in the current repository"
 license = "MIT"
@@ -8,7 +8,9 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+crossterm = "0.28"
 directories = "6.0"
+ratatui = "0.29"
 serde = { version = "1.0", features = ["derive"] }
 tempfile = "3.20"
 toml = "0.9"

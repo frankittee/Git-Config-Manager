@@ -72,11 +72,21 @@ pub fn ensure_repository() -> Result<()> {
 }
 
 pub fn read_identity() -> Result<GitIdentity> {
-    Ok(GitIdentity {
-        name: get_first(ConfigScope::Local, "user.name")?,
-        email: get_first(ConfigScope::Local, "user.email")?,
-        signing_key: get_first(ConfigScope::Local, "user.signingkey")?,
-        gpg_sign: get_first(ConfigScope::Local, "commit.gpgsign")?,
+    read_identity_at(ConfigScope::Local)
+}
+
+pub fn read_current_identity() -> Result<GitIdentity> {
+    let scope = config_scope()?;
+    if matches!(scope, ConfigScope::Local) {
+        ensure_repository()?;
+    }
+    read_identity_at(scope)
+}
+
+pub fn current_scope_label() -> Result<&'static str> {
+    Ok(match config_scope()? {
+        ConfigScope::Local => "LOCAL",
+        ConfigScope::Global => "GLOBAL",
     })
 }
 
@@ -152,6 +162,15 @@ fn restore(scope: ConfigScope, values: &[(&str, Vec<String>)]) -> Result<()> {
 
 fn get_first(scope: ConfigScope, key: &str) -> Result<Option<String>> {
     Ok(get_all(scope, key)?.into_iter().next())
+}
+
+fn read_identity_at(scope: ConfigScope) -> Result<GitIdentity> {
+    Ok(GitIdentity {
+        name: get_first(scope, "user.name")?,
+        email: get_first(scope, "user.email")?,
+        signing_key: get_first(scope, "user.signingkey")?,
+        gpg_sign: get_first(scope, "commit.gpgsign")?,
+    })
 }
 
 fn config_origin(scope: ConfigScope, key: &str) -> Result<String> {

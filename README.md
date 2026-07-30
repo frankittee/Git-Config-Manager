@@ -18,6 +18,19 @@ to use a different destination, or `GCS_VERSION` to install a specific version.
 
 ## Usage
 
+Run `gcs` without a subcommand to open the interactive terminal interface:
+
+```sh
+gcs
+```
+
+The TUI shows saved profiles and the current Git identity side by side. Use
+`↑`/`↓` or `j`/`k` to navigate, `Enter` or `u` to apply a profile, `a` to add,
+`e` to edit, `d` to delete, and `q` to quit. Adding and editing use `Tab` to
+move between fields, `Space` to toggle commit signing, `Enter` to save, and
+`Esc` to cancel.
+
+The existing subcommands remain available for scripts and direct operations.
 Run `add` without field options to answer the prompts interactively:
 
 ```text
@@ -54,8 +67,9 @@ gcs info
 gcs remove personal
 ```
 
-Interactive input requires a terminal. In CI and other non-interactive
-environments, provide both `--name` and `--email`.
+The TUI and interactive input require a terminal. In CI and other
+non-interactive environments, use an explicit subcommand and provide both
+`--name` and `--email` when adding a profile.
 
 Profiles are saved in `$HOME/.config/git-config-switch/config.toml`. Setting
 `GCS_CONFIG_DIR` overrides the containing directory, which is useful for isolated

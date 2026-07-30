@@ -2,6 +2,7 @@ mod cli;
 mod git;
 mod input;
 mod profiles;
+mod tui;
 
 use std::io::{self, IsTerminal};
 
@@ -20,12 +21,18 @@ fn run() -> Result<()> {
     let store = profiles::ProfileStore::from_environment()?;
 
     match cli.command {
-        cli::Command::Add {
+        None => {
+            if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+                bail!("TUI requires an interactive terminal; use a subcommand for automation");
+            }
+            tui::run(store)?;
+        }
+        Some(cli::Command::Add {
             profile,
             name,
             email,
             signing_key,
-        } => {
+        }) => {
             let interactive = name.is_none() || email.is_none();
             let value = if interactive {
                 store.ensure_available(&profile)?;
@@ -45,13 +52,13 @@ fn run() -> Result<()> {
             store.add(profile.clone(), value)?;
             println!("{profile}");
         }
-        cli::Command::Edit {
+        Some(cli::Command::Edit {
             profile,
             name,
             email,
             signing_key,
             no_signing,
-        } => {
+        }) => {
             let current = store.get(&profile)?;
             let has_options =
                 name.is_some() || email.is_some() || signing_key.is_some() || no_signing;
@@ -78,12 +85,12 @@ fn run() -> Result<()> {
             store.update(&profile, value)?;
             println!("{profile}");
         }
-        cli::Command::List => {
+        Some(cli::Command::List) => {
             for name in store.list()? {
                 println!("{name}");
             }
         }
-        cli::Command::Show { profile } => {
+        Some(cli::Command::Show { profile }) => {
             let value = store.get(&profile)?;
             println!("name={}", value.name);
             println!("email={}", value.email);
@@ -91,16 +98,16 @@ fn run() -> Result<()> {
                 println!("signing_key={signing_key}");
             }
         }
-        cli::Command::Remove { profile } => {
+        Some(cli::Command::Remove { profile }) => {
             store.remove(&profile)?;
             println!("{profile}");
         }
-        cli::Command::Use { profile } => {
+        Some(cli::Command::Use { profile }) => {
             let value = store.get(&profile)?;
             let config_file = git::apply_profile(&value)?;
             println!("Successfully write profiles into {config_file}");
         }
-        cli::Command::Info => {
+        Some(cli::Command::Info) => {
             git::ensure_repository()?;
             let current = git::read_identity()?;
             let profiles = store.load()?;

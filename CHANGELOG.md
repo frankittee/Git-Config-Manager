@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-30
+
 ### Added
 
+- Added a Ratatui terminal interface for browsing, creating, editing, deleting,
+  and applying profiles, with responsive layouts and contextual status
+  information. Run `gcs` without a subcommand to open it.
 - Added an installer for verified Linux and macOS release binaries.
 
 ## [0.2.0] - 2026-07-30
@@ -42,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added tagged GitHub releases for Linux x86_64/ARM64 musl and macOS
   Intel/Apple Silicon.
 
-[Unreleased]: https://github.com/frankittee/Git-Config-Switch/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/frankittee/Git-Config-Switch/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/frankittee/Git-Config-Switch/releases/tag/v0.1.0

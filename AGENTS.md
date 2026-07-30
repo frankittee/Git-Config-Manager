@@ -61,6 +61,9 @@ validation performed. Link relevant issues. Screenshots are only needed for
 terminal output whose presentation changed. Do not combine unrelated refactors
 with feature or bug-fix work.
 
+Run GitHub CLI commands through mise, for example `mise x -- gh auth status`,
+rather than invoking `gh` directly.
+
 ## Release Safety
 
 Releases are triggered only by `v*` tags. Update both `Cargo.toml` and

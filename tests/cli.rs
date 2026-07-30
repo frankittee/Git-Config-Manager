@@ -92,6 +92,15 @@ fn add(context: &TestContext, profile: &str, name: &str, email: &str) {
 }
 
 #[test]
+fn bare_command_requires_a_terminal() {
+    let context = TestContext::new(true);
+    let output = context.gcs(&[]);
+
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("TUI requires an interactive terminal"));
+}
+
+#[test]
 fn profile_management_round_trip() {
     let context = TestContext::new(true);
     add(&context, "work", "Work User", "work@example.com");

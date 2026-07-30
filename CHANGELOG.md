@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a Ratatui terminal interface for browsing, creating, editing, deleting,
+  and applying profiles, with responsive layouts and contextual status
+  information. Run `gcs` without a subcommand to open it.
 - Added an installer for verified Linux and macOS release binaries.
 
 ## [0.2.0] - 2026-07-30

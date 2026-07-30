@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            linux: true
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            linux: true
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            linux: false
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            linux: false
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Verify tag matches Cargo version
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="$(awk -F '"' '/^version = "/ { print $2; exit }' Cargo.toml)"
+          if [[ "$tag_version" != "$cargo_version" ]]; then
+            echo "Tag version '$tag_version' does not match Cargo.toml version '$cargo_version'." >&2
+            exit 1
+          fi
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install musl toolchain
+        if: matrix.linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes musl-tools
+
+      - name: Run tests
+        run: cargo test --locked
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Verify static Linux binary
+        if: matrix.linux
+        shell: bash
+        run: file "target/${{ matrix.target }}/release/gcs" | grep -q "statically linked"
+
+      - name: Package binary
+        shell: bash
+        run: |
+          archive="gcs-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
+          tar -czf "$archive" -C "target/${{ matrix.target }}/release" gcs
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: gcs-${{ matrix.target }}
+          path: gcs-*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: gcs-*
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum gcs-*.tar.gz > SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" gcs-*.tar.gz SHA256SUMS --generate-notes --verify-tag

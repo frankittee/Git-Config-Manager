@@ -8,8 +8,13 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 ## Install
 
 ```sh
-cargo install --path .
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | sh
 ```
+
+The installer downloads the latest release for Linux or macOS, verifies its
+SHA-256 checksum, and installs `gcs` to `~/.local/bin`. Set `GCS_INSTALL_DIR`
+to use a different destination, or `GCS_VERSION` to install a specific version.
 
 ## Usage
 

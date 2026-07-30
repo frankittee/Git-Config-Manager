@@ -581,9 +581,10 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
         ],
         None => vec![Span::styled("○ Unmanaged", Theme::muted())],
     };
+    let directory = compact_path(&app.current_dir, 28);
     let mut right = vec![
         Span::styled(format!(" {} ", app.scope), Theme::key()),
-        Span::styled(format!("{}  ", app.current_dir), Theme::muted()),
+        Span::styled(format!("{directory}  "), Theme::muted()),
     ];
     right.extend(active);
     frame.render_widget(
@@ -962,6 +963,20 @@ fn tail_chars(value: &str, width: usize) -> String {
     chars[start..].iter().collect()
 }
 
+fn compact_path(value: &str, width: usize) -> String {
+    let chars: Vec<char> = value.chars().collect();
+    if chars.len() <= width {
+        return value.to_owned();
+    }
+    let suffix_width = width.saturating_sub(1);
+    format!(
+        "…{}",
+        chars[chars.len() - suffix_width..]
+            .iter()
+            .collect::<String>()
+    )
+}
+
 fn centered_rect(percent_x: u16, height: u16, area: Rect) -> Rect {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
@@ -1102,6 +1117,8 @@ mod tests {
     #[test]
     fn renders_header_and_active_profile() {
         let mut app = app();
+        app.current_dir =
+            "/Users/runner/work/a-very-long-repository-name/a-very-long-repository-name".into();
         let profile = Profile {
             name: "Ada".into(),
             email: "ada@example.com".into(),
@@ -1123,6 +1140,7 @@ mod tests {
         assert!(screen.contains("Active"));
         assert!(screen.contains("work"));
         assert!(screen.contains(&app.scope));
+        assert!(screen.contains('…'));
     }
 
     #[test]
@@ -1185,5 +1203,11 @@ mod tests {
     #[test]
     fn tail_chars_keeps_the_visible_suffix() {
         assert_eq!(tail_chars("long@example.com", 7), "ple.com");
+    }
+
+    #[test]
+    fn compact_path_preserves_short_values_and_truncates_long_ones() {
+        assert_eq!(compact_path("/tmp/repo", 20), "/tmp/repo");
+        assert_eq!(compact_path("/very/long/path/to/repo", 10), "…h/to/repo");
     }
 }

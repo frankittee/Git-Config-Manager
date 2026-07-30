@@ -65,7 +65,13 @@ jobs:
       - name: Verify static Linux binary
         if: matrix.linux
         shell: bash
-        run: file "target/${{ matrix.target }}/release/gcs" | grep -q "statically linked"
+        run: |
+          binary="target/${{ matrix.target }}/release/gcs"
+          file "$binary"
+          if readelf --program-headers "$binary" | grep -q "INTERP"; then
+            echo "Linux binary contains a dynamic loader INTERP segment." >&2
+            exit 1
+          fi
 
       - name: Package binary
         shell: bash

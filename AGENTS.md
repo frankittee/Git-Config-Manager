@@ -45,6 +45,8 @@ Use concise Conventional Commit-style subjects matching repository history, for 
 
 Pull requests should explain the behavior change, motivation, CLI examples, and validation performed. Link relevant issues. Screenshots are only needed for terminal output whose presentation changed. Do not combine unrelated refactors with feature or bug-fix work.
 
+Merge pull requests with squash merge by default so all changes from a PR become a single commit on the target branch. Keep version and release changes in a separate release commit.
+
 Run GitHub CLI commands through mise, for example `mise x -- gh auth status`, rather than invoking `gh` directly.
 
 ## Release Safety

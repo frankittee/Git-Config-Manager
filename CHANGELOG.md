@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-31
+
 ### Added
 
 - Profiles can now store an optional SSH host alias. Applying one rewrites all SSH remote fetch and explicit push URLs after validating a literal matching `Host` entry in `~/.ssh/config`.
@@ -42,7 +44,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added transactional repository-local Git configuration updates with rollback.
 - Added tagged GitHub releases for Linux x86_64/ARM64 musl and macOS Intel/Apple Silicon.
 
-[Unreleased]: https://github.com/frankittee/Git-Config-Switch/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.0...v0.1.1

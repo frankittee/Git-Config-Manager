@@ -8,6 +8,7 @@ pub fn collect_profile(
     name: Option<String>,
     email: Option<String>,
     signing_key: Option<String>,
+    ssh_host: Option<String>,
     reader: &mut impl BufRead,
     writer: &mut impl Write,
 ) -> Result<Profile> {
@@ -26,11 +27,16 @@ pub fn collect_profile(
         }
         None => None,
     };
+    let ssh_host = match ssh_host {
+        Some(value) => Some(value),
+        None => prompt_optional("SSH host alias (leave blank to skip): ", reader, writer)?,
+    };
 
     Ok(Profile {
         name,
         email,
         signing_key,
+        ssh_host,
     })
 }
 
@@ -55,11 +61,14 @@ pub fn edit_profile(
     } else {
         None
     };
+    let ssh_host =
+        prompt_optional_with_default("SSH host alias", current.ssh_host, reader, writer)?;
 
     Ok(Profile {
         name,
         email,
         signing_key,
+        ssh_host,
     })
 }
 
@@ -76,6 +85,16 @@ fn prompt_required(
         }
         writeln!(writer, "Value must not be empty.").context("could not write prompt")?;
     }
+}
+
+fn prompt_optional(
+    prompt: &str,
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+) -> Result<Option<String>> {
+    write_prompt(prompt, writer)?;
+    let value = read_line(reader)?;
+    Ok((!value.is_empty()).then_some(value))
 }
 
 fn prompt_confirmation(
@@ -109,6 +128,27 @@ fn prompt_with_default(
     } else {
         Ok(value)
     }
+}
+
+fn prompt_optional_with_default(
+    label: &str,
+    default: Option<String>,
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+) -> Result<Option<String>> {
+    let suffix = default
+        .as_deref()
+        .map(|value| format!("{value}; blank keeps, - clears"))
+        .unwrap_or_else(|| "leave blank to skip".to_owned());
+    write_prompt(&format!("{label} [{suffix}]: "), writer)?;
+    let value = read_line(reader)?;
+    Ok(if value == "-" {
+        None
+    } else if value.is_empty() {
+        default
+    } else {
+        Some(value)
+    })
 }
 
 fn prompt_confirmation_with_default(
@@ -158,6 +198,7 @@ mod tests {
         name: Option<&str>,
         email: Option<&str>,
         signing_key: Option<&str>,
+        ssh_host: Option<&str>,
         input: &str,
     ) -> (Result<Profile>, String) {
         let mut reader = Cursor::new(input.as_bytes());
@@ -166,6 +207,7 @@ mod tests {
             name.map(str::to_owned),
             email.map(str::to_owned),
             signing_key.map(str::to_owned),
+            ssh_host.map(str::to_owned),
             &mut reader,
             &mut output,
         );
@@ -174,38 +216,49 @@ mod tests {
 
     #[test]
     fn collects_unsigned_profile_in_order() {
-        let (result, output) = collect(None, None, None, " Ada \n ada@example.com \n\n");
+        let (result, output) = collect(None, None, None, None, " Ada \n ada@example.com \n\n\n");
         assert_eq!(
             result.unwrap(),
             Profile {
                 name: "Ada".into(),
                 email: "ada@example.com".into(),
                 signing_key: None,
+                ssh_host: None,
             }
         );
         assert_eq!(
             output,
-            "Git author name: Git author email: Enable commit signing? [y/N]: "
+            "Git author name: Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): "
         );
     }
 
     #[test]
     fn only_prompts_for_missing_required_values() {
-        let (result, output) = collect(Some("Ada"), None, None, "ada@example.com\nno\n");
+        let (result, output) = collect(Some("Ada"), None, None, None, "ada@example.com\nno\n\n");
         assert_eq!(result.unwrap().email, "ada@example.com");
-        assert_eq!(output, "Git author email: Enable commit signing? [y/N]: ");
+        assert_eq!(
+            output,
+            "Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): "
+        );
     }
 
     #[test]
     fn collects_signing_key_after_confirmation() {
-        let (result, output) = collect(None, None, None, "Ada\na@example.com\nYES\n KEY \n");
+        let (result, output) =
+            collect(None, None, None, None, "Ada\na@example.com\nYES\n KEY \n\n");
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
-        assert!(output.ends_with("Signing key: "));
+        assert!(output.contains("Signing key: "));
     }
 
     #[test]
     fn retries_empty_required_and_invalid_confirmation() {
-        let (result, output) = collect(None, None, None, "\nAda\n\na@example.com\nmaybe\ny\nKEY\n");
+        let (result, output) = collect(
+            None,
+            None,
+            None,
+            None,
+            "\nAda\n\na@example.com\nmaybe\ny\nKEY\n\n",
+        );
         assert!(result.is_ok());
         assert_eq!(output.matches("Git author name: ").count(), 2);
         assert_eq!(output.matches("Git author email: ").count(), 2);
@@ -216,14 +269,14 @@ mod tests {
 
     #[test]
     fn provided_signing_key_skips_confirmation() {
-        let (result, output) = collect(None, None, Some("KEY"), "Ada\na@example.com\n");
+        let (result, output) = collect(None, None, Some("KEY"), None, "Ada\na@example.com\n\n");
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
         assert!(!output.contains("Enable commit signing?"));
     }
 
     #[test]
     fn eof_cancels_collection() {
-        let (result, _) = collect(None, None, None, "Ada\n");
+        let (result, _) = collect(None, None, None, None, "Ada\n");
         assert!(result.unwrap_err().to_string().contains("input ended"));
     }
 
@@ -233,8 +286,9 @@ mod tests {
             name: "Ada".into(),
             email: "ada@example.com".into(),
             signing_key: Some("KEY".into()),
+            ssh_host: None,
         };
-        let mut reader = Cursor::new(b"\n\n\n\n");
+        let mut reader = Cursor::new(b"\n\n\n\n\n");
         let mut output = Vec::new();
         let edited = edit_profile(current.clone(), &mut reader, &mut output).unwrap();
 
@@ -251,8 +305,9 @@ mod tests {
             name: "Old".into(),
             email: "old@example.com".into(),
             signing_key: Some("KEY".into()),
+            ssh_host: None,
         };
-        let mut reader = Cursor::new(b"New\nnew@example.com\nno\n");
+        let mut reader = Cursor::new(b"New\nnew@example.com\nno\n\n");
         let mut output = Vec::new();
         let edited = edit_profile(current, &mut reader, &mut output).unwrap();
 

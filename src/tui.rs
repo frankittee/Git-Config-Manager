@@ -25,15 +25,16 @@ use crate::{
     profiles::{Profile, ProfileStore, Profiles},
 };
 
-const FIELDS: [&str; 5] = [
+const FIELDS: [&str; 6] = [
     "Profile name",
     "Git author name",
     "Git author email",
     "Commit signing",
     "Signing key",
+    "SSH host alias",
 ];
 const MIN_WIDTH: u16 = 52;
-const MIN_HEIGHT: u16 = 18;
+const MIN_HEIGHT: u16 = 22;
 const WIDE_WIDTH: u16 = 90;
 
 struct Theme;
@@ -50,7 +51,9 @@ impl Theme {
     }
 
     fn focused_border() -> Style {
-        Style::default().fg(Self::ACCENT)
+        Style::default()
+            .fg(Self::ACCENT)
+            .add_modifier(Modifier::BOLD)
     }
 
     fn label() -> Style {
@@ -72,6 +75,10 @@ impl Theme {
             .fg(Color::Black)
             .bg(Self::ACCENT)
             .add_modifier(Modifier::BOLD)
+    }
+
+    fn focused_label() -> Style {
+        Self::selected()
     }
 }
 
@@ -173,6 +180,7 @@ struct Form {
     email: String,
     signing_enabled: bool,
     signing_key: String,
+    ssh_host: String,
 }
 
 impl Form {
@@ -185,6 +193,7 @@ impl Form {
             email: String::new(),
             signing_enabled: false,
             signing_key: String::new(),
+            ssh_host: String::new(),
         }
     }
 
@@ -197,6 +206,7 @@ impl Form {
             email: profile.email,
             signing_enabled: profile.signing_key.is_some(),
             signing_key: profile.signing_key.unwrap_or_default(),
+            ssh_host: profile.ssh_host.unwrap_or_default(),
         }
     }
 
@@ -205,32 +215,30 @@ impl Form {
             name: self.author_name.clone(),
             email: self.email.clone(),
             signing_key: self.signing_enabled.then(|| self.signing_key.clone()),
+            ssh_host: (!self.ssh_host.is_empty()).then(|| self.ssh_host.clone()),
         }
     }
 
     fn next_field(&mut self) {
-        let mut next = (self.field + 1) % FIELDS.len();
-        if self.mode == FormMode::Edit && next == 0 {
-            next = 1;
+        loop {
+            self.field = (self.field + 1) % FIELDS.len();
+            if self.field_is_editable(self.field) {
+                return;
+            }
         }
-        if !self.signing_enabled && next == 4 {
-            next = if self.mode == FormMode::Edit { 1 } else { 0 };
-        }
-        self.field = next;
     }
 
     fn previous_field(&mut self) {
-        let mut next = self.field.checked_sub(1).unwrap_or(FIELDS.len() - 1);
-        if !self.signing_enabled && next == 4 {
-            next = 3;
-        }
-        if self.mode == FormMode::Edit && next == 0 {
-            next = FIELDS.len() - 1;
-            if !self.signing_enabled {
-                next = 3;
+        loop {
+            self.field = self.field.checked_sub(1).unwrap_or(FIELDS.len() - 1);
+            if self.field_is_editable(self.field) {
+                return;
             }
         }
-        self.field = next;
+    }
+
+    fn field_is_editable(&self, field: usize) -> bool {
+        !(self.mode == FormMode::Edit && field == 0) && (field != 4 || self.signing_enabled)
     }
 
     fn value_mut(&mut self) -> Option<&mut String> {
@@ -239,6 +247,7 @@ impl Form {
             1 => Some(&mut self.author_name),
             2 => Some(&mut self.email),
             4 if self.signing_enabled => Some(&mut self.signing_key),
+            5 => Some(&mut self.ssh_host),
             _ => None,
         }
     }
@@ -247,6 +256,11 @@ impl Form {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Modal {
     Form(Form),
+    SshHostPicker {
+        form: Form,
+        aliases: Vec<String>,
+        selected: usize,
+    },
     ConfirmDelete(String),
 }
 
@@ -339,10 +353,17 @@ impl App {
     fn handle_key(&mut self, key: KeyEvent) {
         match self.modal.take() {
             Some(Modal::Form(mut form)) => {
-                if !self.handle_form_key(&mut form, key) {
+                if key.code == KeyCode::Char(' ') && form.field == 5 {
+                    self.open_ssh_host_picker(form);
+                } else if !self.handle_form_key(&mut form, key) {
                     self.modal = Some(Modal::Form(form));
                 }
             }
+            Some(Modal::SshHostPicker {
+                form,
+                aliases,
+                selected,
+            }) => self.handle_ssh_host_picker(form, aliases, selected, key),
             Some(Modal::ConfirmDelete(name)) => {
                 self.handle_delete_key(name, key);
             }
@@ -419,6 +440,69 @@ impl App {
                 false
             }
             _ => false,
+        }
+    }
+
+    fn open_ssh_host_picker(&mut self, form: Form) {
+        match git::ssh_host_aliases() {
+            Ok(aliases) if aliases.is_empty() => {
+                self.set_error("No literal SSH host aliases were found in ~/.ssh/config");
+                self.modal = Some(Modal::Form(form));
+            }
+            Ok(aliases) => {
+                let selected = aliases
+                    .iter()
+                    .position(|alias| alias == &form.ssh_host)
+                    .unwrap_or(0);
+                self.modal = Some(Modal::SshHostPicker {
+                    form,
+                    aliases,
+                    selected,
+                });
+            }
+            Err(error) => {
+                self.set_error(error);
+                self.modal = Some(Modal::Form(form));
+            }
+        }
+    }
+
+    fn handle_ssh_host_picker(
+        &mut self,
+        mut form: Form,
+        aliases: Vec<String>,
+        mut selected: usize,
+        key: KeyEvent,
+    ) {
+        match key.code {
+            KeyCode::Esc => self.modal = Some(Modal::Form(form)),
+            KeyCode::Up | KeyCode::Char('k') => {
+                selected = selected.saturating_sub(1);
+                self.modal = Some(Modal::SshHostPicker {
+                    form,
+                    aliases,
+                    selected,
+                });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                selected = (selected + 1).min(aliases.len().saturating_sub(1));
+                self.modal = Some(Modal::SshHostPicker {
+                    form,
+                    aliases,
+                    selected,
+                });
+            }
+            KeyCode::Enter => {
+                form.ssh_host = aliases[selected].clone();
+                self.modal = Some(Modal::Form(form));
+            }
+            _ => {
+                self.modal = Some(Modal::SshHostPicker {
+                    form,
+                    aliases,
+                    selected,
+                });
+            }
         }
     }
 
@@ -532,6 +616,9 @@ fn render(frame: &mut Frame, app: &App) {
     if let Some(modal) = &app.modal {
         match modal {
             Modal::Form(form) => render_form(frame, form, app.status.as_ref()),
+            Modal::SshHostPicker {
+                aliases, selected, ..
+            } => render_ssh_host_picker(frame, aliases, *selected),
             Modal::ConfirmDelete(name) => render_confirmation(frame, name),
         }
     }
@@ -670,6 +757,10 @@ fn render_details(frame: &mut Frame, app: &App, area: Rect) {
                 Span::styled("Signing key  ", Theme::muted()),
                 optional_value(profile.signing_key.as_deref()),
             ]),
+            Line::from(vec![
+                Span::styled("SSH host     ", Theme::muted()),
+                optional_value(profile.ssh_host.as_deref()),
+            ]),
             Line::from(""),
         ]);
     }
@@ -720,10 +811,13 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
         Some(Modal::Form(_)) => help_line(&[
             ("Tab", "next"),
             ("↑/↓", "field"),
-            ("Space", "toggle"),
+            ("Space", "toggle/select SSH host"),
             ("Enter", "save"),
             ("Esc", "cancel"),
         ]),
+        Some(Modal::SshHostPicker { .. }) => {
+            help_line(&[("↑/↓ j/k", "select"), ("Enter", "use"), ("Esc", "cancel")])
+        }
         Some(Modal::ConfirmDelete(_)) => help_line(&[("y", "confirm"), ("n/Esc", "cancel")]),
         None => help_line(&[
             ("↑/↓ j/k", "navigate"),
@@ -738,7 +832,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
-    let area = centered_rect(78, 19, frame.area());
+    let area = centered_rect(78, 22, frame.area());
     render_modal_backdrop(frame);
     frame.render_widget(Clear, area);
     let title = if form.mode == FormMode::Add {
@@ -769,6 +863,7 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
             Constraint::Length(3),
             Constraint::Length(2),
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Min(2),
         ])
         .split(inner);
@@ -778,8 +873,9 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
         form.email.as_str(),
         "",
         form.signing_key.as_str(),
+        form.ssh_host.as_str(),
     ];
-    for (index, row) in rows.iter().take(5).enumerate() {
+    for (index, row) in rows.iter().take(6).enumerate() {
         if index == 3 {
             let toggle = if form.signing_enabled {
                 "◉ Enabled"
@@ -807,7 +903,11 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
         render_input(
             frame,
             *row,
-            FIELDS[index],
+            if index == 5 {
+                "SSH host alias (Space to choose)"
+            } else {
+                FIELDS[index]
+            },
             values[index],
             form.field == index,
             read_only,
@@ -822,9 +922,36 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
                 Span::styled(&message.text, message.style()),
             ]))
             .wrap(Wrap { trim: true }),
-            rows[5],
+            rows[6],
         );
     }
+}
+
+fn render_ssh_host_picker(frame: &mut Frame, aliases: &[String], selected: usize) {
+    let visible = aliases.len().min(8);
+    let height = (visible as u16 + 6).min(frame.area().height);
+    let area = centered_rect(58, height, frame.area());
+    render_modal_backdrop(frame);
+    frame.render_widget(Clear, area);
+    let start = selected.saturating_sub(visible.saturating_sub(1));
+    let items = aliases[start..]
+        .iter()
+        .take(visible)
+        .map(|alias| ListItem::new(alias.as_str()))
+        .collect::<Vec<_>>();
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Theme::focused_border())
+                .title(Span::styled(" Select SSH host alias ", Theme::key())),
+        )
+        .highlight_style(Theme::selected())
+        .highlight_symbol("› ");
+    let mut state = ListState::default();
+    state.select(Some(selected - start));
+    frame.render_stateful_widget(list, area, &mut state);
 }
 
 fn render_input(
@@ -838,7 +965,14 @@ fn render_input(
 ) {
     let suffix = if read_only { "  locked" } else { "" };
     let title = Line::from(vec![
-        Span::styled(format!(" {label} "), Theme::muted()),
+        Span::styled(
+            format!(" {label} "),
+            if focused {
+                Theme::focused_label()
+            } else {
+                Theme::muted()
+            },
+        ),
         Span::styled(suffix, Theme::muted()),
     ]);
     let block = Block::default()
@@ -1022,6 +1156,7 @@ mod tests {
                     name: "A".into(),
                     email: "a@example.com".into(),
                     signing_key: None,
+                    ssh_host: None,
                 },
             )
             .unwrap();
@@ -1032,6 +1167,7 @@ mod tests {
                     name: "B".into(),
                     email: "b@example.com".into(),
                     signing_key: None,
+                    ssh_host: None,
                 },
             )
             .unwrap();
@@ -1062,10 +1198,37 @@ mod tests {
             name: "Ada".into(),
             email: "ada@example.com".into(),
             signing_key: None,
+            ssh_host: None,
         };
         let mut form = Form::edit("work".into(), profile);
         form.previous_field();
         assert_ne!(form.field, 0);
+    }
+
+    #[test]
+    fn form_maps_ssh_host_to_profile() {
+        let mut form = Form::add();
+        form.ssh_host = "github-work".into();
+        assert_eq!(form.profile().ssh_host.as_deref(), Some("github-work"));
+    }
+
+    #[test]
+    fn ssh_host_picker_applies_the_selected_alias() {
+        let mut app = app();
+        app.handle_ssh_host_picker(
+            Form::add(),
+            vec!["github-personal".into(), "github-work".into()],
+            0,
+            key(KeyCode::Down),
+        );
+        app.handle_key(key(KeyCode::Enter));
+        assert!(matches!(
+            app.modal,
+            Some(Modal::Form(Form {
+                ref ssh_host,
+                ..
+            })) if ssh_host == "github-work"
+        ));
     }
 
     #[test]
@@ -1078,6 +1241,7 @@ mod tests {
                     name: "Ada".into(),
                     email: "a@example.com".into(),
                     signing_key: None,
+                    ssh_host: None,
                 },
             )
             .unwrap();
@@ -1104,6 +1268,7 @@ mod tests {
                     name: "Ada".into(),
                     email: "ada@example.com".into(),
                     signing_key: None,
+                    ssh_host: None,
                 },
             )
             .unwrap();
@@ -1123,6 +1288,7 @@ mod tests {
             name: "Ada".into(),
             email: "ada@example.com".into(),
             signing_key: None,
+            ssh_host: None,
         };
         app.store.add("work".into(), profile.clone()).unwrap();
         app.refresh(None).unwrap();

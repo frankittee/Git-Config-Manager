@@ -1,5 +1,6 @@
 use std::{
-    env,
+    collections::BTreeSet,
+    env, fs,
     path::PathBuf,
     process::{Command, Output},
 };
@@ -9,7 +10,7 @@ use directories::BaseDirs;
 
 use crate::profiles::Profile;
 
-const KEYS: [&str; 4] = [
+const IDENTITY_KEYS: [&str; 4] = [
     "user.name",
     "user.email",
     "user.signingkey",
@@ -95,8 +96,16 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
     if matches!(scope, ConfigScope::Local) {
         ensure_repository()?;
     }
-    let original = snapshot(scope)?;
+    if let Some(ssh_host) = &profile.ssh_host {
+        ensure_ssh_host_exists(ssh_host)?;
+    }
+
+    let remote_updates = remote_updates(scope, profile.ssh_host.as_deref())?;
+    let mut keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    keys.extend(remote_updates.iter().map(|update| update.key.clone()));
+    let original = snapshot(scope, &keys)?;
     let result = apply(scope, profile);
+    let result = result.and_then(|()| apply_remote_updates(scope, &remote_updates));
     if let Err(error) = result {
         if let Err(rollback_error) = restore(scope, &original) {
             return Err(error.context(format!("rollback also failed: {rollback_error:#}")));
@@ -144,13 +153,19 @@ fn apply(scope: ConfigScope, profile: &Profile) -> Result<()> {
     Ok(())
 }
 
-fn snapshot(scope: ConfigScope) -> Result<Vec<(&'static str, Vec<String>)>> {
-    KEYS.into_iter()
-        .map(|key| Ok((key, get_all(scope, key)?)))
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RemoteUpdate {
+    key: String,
+    values: Vec<String>,
+}
+
+fn snapshot(scope: ConfigScope, keys: &[String]) -> Result<Vec<(String, Vec<String>)>> {
+    keys.iter()
+        .map(|key| Ok((key.clone(), get_all(scope, key)?)))
         .collect()
 }
 
-fn restore(scope: ConfigScope, values: &[(&str, Vec<String>)]) -> Result<()> {
+fn restore(scope: ConfigScope, values: &[(String, Vec<String>)]) -> Result<()> {
     for (key, stored_values) in values {
         unset(scope, key)?;
         for value in stored_values {
@@ -158,6 +173,132 @@ fn restore(scope: ConfigScope, values: &[(&str, Vec<String>)]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn ensure_ssh_host_exists(alias: &str) -> Result<()> {
+    let aliases = ssh_host_aliases()?;
+    if aliases
+        .iter()
+        .any(|candidate| candidate.eq_ignore_ascii_case(alias))
+    {
+        Ok(())
+    } else {
+        let path = ssh_config_path()?;
+        bail!(
+            "SSH host alias '{alias}' is not declared as a literal Host in {}",
+            path.display()
+        );
+    }
+}
+
+pub fn ssh_host_aliases() -> Result<Vec<String>> {
+    let path = ssh_config_path()?;
+    let contents = fs::read_to_string(&path)
+        .with_context(|| format!("could not read SSH configuration {}", path.display()))?;
+    Ok(parse_ssh_host_aliases(&contents))
+}
+
+fn ssh_config_path() -> Result<PathBuf> {
+    let base_dirs = BaseDirs::new().context("could not determine the user home directory")?;
+    Ok(base_dirs.home_dir().join(".ssh").join("config"))
+}
+
+fn parse_ssh_host_aliases(contents: &str) -> Vec<String> {
+    let aliases: BTreeSet<String> = contents
+        .lines()
+        .flat_map(|line| {
+            let declaration = line.split_once('#').map_or(line, |(before, _)| before);
+            let mut fields = declaration.split_whitespace();
+            matches!(fields.next(), Some(keyword) if keyword.eq_ignore_ascii_case("host"))
+                .then(|| {
+                    fields
+                        .filter(|candidate| !candidate.contains(['*', '?', '!']))
+                        .map(str::to_owned)
+                })
+                .into_iter()
+                .flatten()
+        })
+        .collect();
+    aliases.into_iter().collect()
+}
+
+fn remote_updates(scope: ConfigScope, ssh_host: Option<&str>) -> Result<Vec<RemoteUpdate>> {
+    let Some(ssh_host) = ssh_host else {
+        return Ok(Vec::new());
+    };
+    if matches!(scope, ConfigScope::Global) {
+        return Ok(Vec::new());
+    }
+    let output = run_git(&["remote"])?;
+    if !output.status.success() {
+        return Err(git_failure("list", "remotes", &output));
+    }
+    let names = String::from_utf8(output.stdout).context("Git returned non-UTF-8 remote names")?;
+    let mut updates = Vec::new();
+    for name in names.lines() {
+        for suffix in ["url", "pushurl"] {
+            let key = format!("remote.{name}.{suffix}");
+            let values = get_all(scope, &key)?;
+            let rewritten: Vec<String> = values
+                .iter()
+                .map(|url| rewrite_ssh_url(url, ssh_host).unwrap_or_else(|| url.clone()))
+                .collect();
+            if values != rewritten {
+                updates.push(RemoteUpdate {
+                    key,
+                    values: rewritten,
+                });
+            }
+        }
+    }
+    Ok(updates)
+}
+
+fn apply_remote_updates(scope: ConfigScope, updates: &[RemoteUpdate]) -> Result<()> {
+    for update in updates {
+        unset(scope, &update.key)?;
+        for value in &update.values {
+            add(scope, &update.key, value)?;
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_ssh_url(url: &str, ssh_host: &str) -> Option<String> {
+    if let Some(remainder) = url.strip_prefix("ssh://") {
+        let (authority, path) = remainder.split_once('/')?;
+        let (user, host_port) = authority
+            .rsplit_once('@')
+            .map_or(("", authority), |(user, host)| (user, host));
+        if host_port.is_empty() || host_port.starts_with('[') {
+            return None;
+        }
+        let port = host_port
+            .find(':')
+            .map(|index| &host_port[index..])
+            .unwrap_or("");
+        let user = if user.is_empty() {
+            String::new()
+        } else {
+            format!("{user}@")
+        };
+        return Some(format!("ssh://{user}{ssh_host}{port}/{path}"));
+    }
+
+    if url.contains("://") {
+        return None;
+    }
+    let (authority, path) = url.split_once(':')?;
+    if authority.is_empty() || authority.contains('/') || path.is_empty() {
+        return None;
+    }
+    let user = authority.rsplit_once('@').map_or("", |(user, _)| user);
+    let user = if user.is_empty() {
+        String::new()
+    } else {
+        format!("{user}@")
+    };
+    Some(format!("{user}{ssh_host}:{path}"))
 }
 
 fn get_first(scope: ConfigScope, key: &str) -> Result<Option<String>> {
@@ -257,6 +398,7 @@ mod tests {
             name: "A".into(),
             email: "a@example.com".into(),
             signing_key: None,
+            ssh_host: None,
         };
         let matching = GitIdentity {
             name: Some("A".into()),
@@ -278,6 +420,7 @@ mod tests {
             name: "A".into(),
             email: "a@example.com".into(),
             signing_key: Some("KEY".into()),
+            ssh_host: None,
         };
         let identity = GitIdentity {
             name: Some("A".into()),
@@ -286,5 +429,31 @@ mod tests {
             gpg_sign: Some("TRUE".into()),
         };
         assert!(identity.matches(&profile));
+    }
+
+    #[test]
+    fn rewrites_only_ssh_url_hosts() {
+        assert_eq!(
+            rewrite_ssh_url("git@github.com:owner/repo.git", "github-work"),
+            Some("git@github-work:owner/repo.git".into())
+        );
+        assert_eq!(
+            rewrite_ssh_url("ssh://git@github.com:2222/owner/repo.git", "github-work"),
+            Some("ssh://git@github-work:2222/owner/repo.git".into())
+        );
+        assert_eq!(
+            rewrite_ssh_url("https://github.com/owner/repo.git", "github-work"),
+            None
+        );
+    }
+
+    #[test]
+    fn parses_only_literal_ssh_host_aliases() {
+        assert_eq!(
+            parse_ssh_host_aliases(
+                "Host github-work github-personal\nHost work-*\nInclude extra\n"
+            ),
+            vec!["github-personal", "github-work"]
+        );
     }
 }

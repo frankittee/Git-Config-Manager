@@ -19,6 +19,8 @@ pub struct Profile {
     pub email: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signing_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_host: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -179,6 +181,13 @@ fn validate_profile(profile: &Profile) -> Result<()> {
     {
         bail!("signing key must not be empty");
     }
+    if profile.ssh_host.as_ref().is_some_and(|host| {
+        host.trim().is_empty()
+            || host.chars().any(char::is_whitespace)
+            || host.contains(['*', '?', '!'])
+    }) {
+        bail!("SSH host alias must be literal, non-empty, and contain no whitespace");
+    }
     Ok(())
 }
 
@@ -204,6 +213,7 @@ mod tests {
             name: name.into(),
             email: email.into(),
             signing_key: None,
+            ssh_host: None,
         }
     }
 

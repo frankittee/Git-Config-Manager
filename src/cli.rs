@@ -27,6 +27,9 @@ pub enum Command {
         /// Signing key; also enables commit.gpgsign
         #[arg(long)]
         signing_key: Option<String>,
+        /// SSH host alias from ~/.ssh/config
+        #[arg(long)]
+        ssh_host: Option<String>,
     },
     /// Edit an existing profile
     Edit {
@@ -44,6 +47,12 @@ pub enum Command {
         /// Remove the signing key and disable commit signing
         #[arg(long)]
         no_signing: bool,
+        /// Set the SSH host alias from ~/.ssh/config
+        #[arg(long, conflicts_with = "no_ssh_host")]
+        ssh_host: Option<String>,
+        /// Remove the SSH host alias
+        #[arg(long)]
+        no_ssh_host: bool,
     },
     /// List saved profile names
     List,

@@ -1,4 +1,5 @@
 use std::{
+    fs,
     path::Path,
     process::{Command, Output},
 };
@@ -7,6 +8,7 @@ use tempfile::TempDir;
 
 struct TestContext {
     config: TempDir,
+    home: TempDir,
     repository: TempDir,
 }
 
@@ -14,6 +16,7 @@ impl TestContext {
     fn new(repository: bool) -> Self {
         let context = Self {
             config: tempfile::tempdir().unwrap(),
+            home: tempfile::tempdir().unwrap(),
             repository: tempfile::tempdir().unwrap(),
         };
         if repository {
@@ -31,6 +34,7 @@ impl TestContext {
     fn gcs(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_gcs"))
             .args(args)
+            .env("HOME", self.home.path())
             .env("GCS_CONFIG_DIR", self.config.path())
             .env("GIT_CONFIG_GLOBAL", self.config.path().join("gitconfig"))
             .current_dir(self.repository.path())
@@ -72,6 +76,38 @@ impl TestContext {
             .status
             .success()
             .then(|| String::from_utf8(output.stdout).unwrap().trim().to_owned())
+    }
+
+    fn git_values(&self, key: &str) -> Vec<String> {
+        let output = Command::new("git")
+            .args(["config", "--local", "--get-all", key])
+            .current_dir(self.repository.path())
+            .output()
+            .unwrap();
+        if output.status.success() {
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .lines()
+                .map(str::to_owned)
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn ssh_config(&self, contents: &str) {
+        let directory = self.home.path().join(".ssh");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("config"), contents).unwrap();
+    }
+
+    fn git(&self, args: &[&str]) {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(self.repository.path())
+            .status()
+            .unwrap();
+        assert!(status.success());
     }
 }
 
@@ -151,6 +187,25 @@ fn edits_profile_fields_non_interactively() {
     let shown = stdout(&context.gcs(&["show", "work"]));
     assert!(shown.contains("name=New User\n"));
     assert!(!shown.contains("signing_key="));
+}
+
+#[test]
+fn edits_and_clears_ssh_host() {
+    let context = TestContext::new(true);
+    assert_success(&context.gcs(&[
+        "add",
+        "work",
+        "--name",
+        "Work User",
+        "--email",
+        "work@example.com",
+        "--ssh-host",
+        "github-work",
+    ]));
+    assert!(stdout(&context.gcs(&["show", "work"])).contains("ssh_host=github-work\n"));
+
+    assert_success(&context.gcs(&["edit", "work", "--no-ssh-host"]));
+    assert!(!stdout(&context.gcs(&["show", "work"])).contains("ssh_host="));
 }
 
 #[test]
@@ -238,6 +293,101 @@ fn signing_is_enabled_and_then_cleared() {
     assert_success(&context.gcs(&["use", "plain"]));
     assert_eq!(context.git_value("user.signingkey"), None);
     assert_eq!(context.git_value("commit.gpgsign"), None);
+}
+
+#[test]
+fn use_rewrites_all_ssh_remote_urls() {
+    let context = TestContext::new(true);
+    context.ssh_config("Host github-work\n  HostName github.com\n");
+    context.git(&[
+        "remote",
+        "add",
+        "origin",
+        "git@github.com:owner/project.git",
+    ]);
+    context.git(&[
+        "config",
+        "--local",
+        "--add",
+        "remote.origin.pushurl",
+        "ssh://git@gitlab.com:2222/group/project.git",
+    ]);
+    context.git(&[
+        "config",
+        "--local",
+        "--add",
+        "remote.origin.pushurl",
+        "git@github.com:owner/project-push.git",
+    ]);
+    context.git(&[
+        "remote",
+        "add",
+        "upstream",
+        "https://github.com/upstream/project.git",
+    ]);
+    assert_success(&context.gcs(&[
+        "add",
+        "work",
+        "--name",
+        "Work User",
+        "--email",
+        "work@example.com",
+        "--ssh-host",
+        "github-work",
+    ]));
+
+    assert_success(&context.gcs(&["use", "work"]));
+
+    assert_eq!(
+        context.git_values("remote.origin.url"),
+        vec!["git@github-work:owner/project.git"]
+    );
+    assert_eq!(
+        context.git_values("remote.origin.pushurl"),
+        vec![
+            "ssh://git@github-work:2222/group/project.git",
+            "git@github-work:owner/project-push.git",
+        ]
+    );
+    assert_eq!(
+        context.git_values("remote.upstream.url"),
+        vec!["https://github.com/upstream/project.git"]
+    );
+}
+
+#[test]
+fn missing_or_non_literal_ssh_host_preserves_configuration() {
+    let context = TestContext::new(true);
+    context.ssh_config("Include aliases\nHost work-*\n  HostName github.com\n");
+    context.git(&[
+        "remote",
+        "add",
+        "origin",
+        "git@github.com:owner/project.git",
+    ]);
+    context.git(&["config", "--local", "user.name", "Original User"]);
+    assert_success(&context.gcs(&[
+        "add",
+        "work",
+        "--name",
+        "Work User",
+        "--email",
+        "work@example.com",
+        "--ssh-host",
+        "work-main",
+    ]));
+
+    let output = context.gcs(&["use", "work"]);
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("not declared as a literal Host"));
+    assert_eq!(
+        context.git_value("user.name").as_deref(),
+        Some("Original User")
+    );
+    assert_eq!(
+        context.git_values("remote.origin.url"),
+        vec!["git@github.com:owner/project.git"]
+    );
 }
 
 #[test]

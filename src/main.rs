@@ -32,6 +32,7 @@ fn run() -> Result<()> {
             name,
             email,
             signing_key,
+            ssh_host,
         }) => {
             let interactive = name.is_none() || email.is_none();
             let value = if interactive {
@@ -41,12 +42,13 @@ fn run() -> Result<()> {
                 }
                 let mut stdin = io::stdin().lock();
                 let mut stderr = io::stderr().lock();
-                input::collect_profile(name, email, signing_key, &mut stdin, &mut stderr)?
+                input::collect_profile(name, email, signing_key, ssh_host, &mut stdin, &mut stderr)?
             } else {
                 profiles::Profile {
                     name: name.expect("name is present in non-interactive mode"),
                     email: email.expect("email is present in non-interactive mode"),
                     signing_key,
+                    ssh_host,
                 }
             };
             store.add(profile.clone(), value)?;
@@ -58,10 +60,16 @@ fn run() -> Result<()> {
             email,
             signing_key,
             no_signing,
+            ssh_host,
+            no_ssh_host,
         }) => {
             let current = store.get(&profile)?;
-            let has_options =
-                name.is_some() || email.is_some() || signing_key.is_some() || no_signing;
+            let has_options = name.is_some()
+                || email.is_some()
+                || signing_key.is_some()
+                || no_signing
+                || ssh_host.is_some()
+                || no_ssh_host;
             let value = if has_options {
                 profiles::Profile {
                     name: name.unwrap_or(current.name),
@@ -70,6 +78,11 @@ fn run() -> Result<()> {
                         None
                     } else {
                         signing_key.or(current.signing_key)
+                    },
+                    ssh_host: if no_ssh_host {
+                        None
+                    } else {
+                        ssh_host.or(current.ssh_host)
                     },
                 }
             } else {
@@ -96,6 +109,9 @@ fn run() -> Result<()> {
             println!("email={}", value.email);
             if let Some(signing_key) = value.signing_key {
                 println!("signing_key={signing_key}");
+            }
+            if let Some(ssh_host) = value.ssh_host {
+                println!("ssh_host={ssh_host}");
             }
         }
         Some(cli::Command::Remove { profile }) => {

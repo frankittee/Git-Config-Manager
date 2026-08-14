@@ -11,11 +11,12 @@ use ssh2_config_rs::{ParseRule, SshConfig};
 
 use crate::profiles::Profile;
 
-const IDENTITY_KEYS: [&str; 4] = [
+const IDENTITY_KEYS: [&str; 5] = [
     "user.name",
     "user.email",
     "user.signingkey",
     "commit.gpgsign",
+    "gpg.format",
 ];
 
 #[derive(Clone, Copy)]
@@ -39,6 +40,7 @@ pub struct GitIdentity {
     pub email: Option<String>,
     pub signing_key: Option<String>,
     pub gpg_sign: Option<String>,
+    pub gpg_format: Option<String>,
 }
 
 impl GitIdentity {
@@ -52,8 +54,16 @@ impl GitIdentity {
                             .gpg_sign
                             .as_deref()
                             .is_some_and(|value| value.eq_ignore_ascii_case("true"))
+                        && self
+                            .gpg_format
+                            .as_deref()
+                            .is_some_and(|value| value.eq_ignore_ascii_case("ssh"))
                 }
-                None => self.signing_key.is_none() && self.gpg_sign.is_none(),
+                None => {
+                    self.signing_key.is_none()
+                        && self.gpg_sign.is_none()
+                        && self.gpg_format.is_none()
+                }
             }
     }
 
@@ -62,6 +72,7 @@ impl GitIdentity {
         print_optional("user.email", &self.email);
         print_optional("user.signingkey", &self.signing_key);
         print_optional("commit.gpgsign", &self.gpg_sign);
+        print_optional("gpg.format", &self.gpg_format);
     }
 }
 
@@ -145,10 +156,12 @@ fn apply(scope: ConfigScope, profile: &Profile) -> Result<()> {
         Some(key) => {
             replace(scope, "user.signingkey", key)?;
             replace(scope, "commit.gpgsign", "true")?;
+            replace(scope, "gpg.format", "ssh")?;
         }
         None => {
             unset(scope, "user.signingkey")?;
             unset(scope, "commit.gpgsign")?;
+            unset(scope, "gpg.format")?;
         }
     }
     Ok(())
@@ -306,6 +319,7 @@ fn read_identity_at(scope: ConfigScope) -> Result<GitIdentity> {
         email: get_first(scope, "user.email")?,
         signing_key: get_first(scope, "user.signingkey")?,
         gpg_sign: get_first(scope, "commit.gpgsign")?,
+        gpg_format: get_first(scope, "gpg.format")?,
     })
 }
 
@@ -422,6 +436,7 @@ mod tests {
             email: Some("a@example.com".into()),
             signing_key: Some("KEY".into()),
             gpg_sign: Some("TRUE".into()),
+            gpg_format: Some("ssh".into()),
         };
         assert!(identity.matches(&profile));
     }

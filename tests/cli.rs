@@ -294,10 +294,12 @@ fn signing_is_enabled_and_then_cleared() {
         Some("ABC123")
     );
     assert_eq!(context.git_value("commit.gpgsign").as_deref(), Some("true"));
+    assert_eq!(context.git_value("gpg.format").as_deref(), Some("ssh"));
 
     assert_success(&context.gcs(&["use", "plain"]));
     assert_eq!(context.git_value("user.signingkey"), None);
     assert_eq!(context.git_value("commit.gpgsign"), None);
+    assert_eq!(context.git_value("gpg.format"), None);
 }
 
 #[test]

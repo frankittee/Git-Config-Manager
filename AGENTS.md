@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains the Rust CLI binary `gcs`.
+This repository contains the Rust CLI binary `g`.
 
 - `src/main.rs` parses commands and coordinates profile and Git operations.
 - `src/cli.rs` defines the `clap` command-line interface.
@@ -12,7 +12,7 @@ This repository contains the Rust CLI binary `gcs`.
 - `tests/cli.rs` contains end-to-end CLI tests using isolated temporary directories and Git repositories.
 - `.github/workflows/release.yml` builds tagged releases for Linux musl and macOS targets.
 
-Profiles default to `$HOME/.config/git-config-switch/config.toml`. Tests must set `GCS_CONFIG_DIR` and must not modify a developer's real configuration.
+Profiles default to `$HOME/.config/git-config-switch/config.toml`. Tests must set `G_CONFIG_DIR` and must not modify a developer's real configuration.
 
 ## Build, Test, and Development Commands
 

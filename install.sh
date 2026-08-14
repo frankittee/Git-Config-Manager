@@ -3,11 +3,11 @@
 set -eu
 
 repository="frankittee/Git-Config-Switch"
-install_dir="${GCS_INSTALL_DIR:-${HOME}/.local/bin}"
-version="${GCS_VERSION:-latest}"
+install_dir="${G_INSTALL_DIR:-${HOME}/.local/bin}"
+version="${G_VERSION:-latest}"
 
 fail() {
-    echo "gcs installer: $*" >&2
+    echo "g installer: $*" >&2
     exit 1
 }
 
@@ -50,12 +50,12 @@ else
 fi
 
 target="${arch}-${os}"
-archive="gcs-${version}-${target}.tar.gz"
+archive="g-${version}-${target}.tar.gz"
 download_url="https://github.com/${repository}/releases/download/${version}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
-echo "Downloading gcs ${version} for ${target}..."
+echo "Downloading g ${version} for ${target}..."
 curl -fsSL "${download_url}/${archive}" -o "${tmp_dir}/${archive}"
 curl -fsSL "${download_url}/SHA256SUMS" -o "${tmp_dir}/SHA256SUMS"
 
@@ -77,12 +77,12 @@ fi
 
 tar -xzf "${tmp_dir}/${archive}" -C "$tmp_dir"
 mkdir -p "$install_dir"
-install -m 755 "${tmp_dir}/gcs" "${install_dir}/gcs"
+install -m 755 "${tmp_dir}/g" "${install_dir}/g"
 
-echo "Installed gcs to ${install_dir}/gcs"
+echo "Installed g to ${install_dir}/g"
 case ":${PATH}:" in
     *":${install_dir}:"*) ;;
     *)
-        echo "Add ${install_dir} to PATH to run gcs."
+        echo "Add ${install_dir} to PATH to run g."
         ;;
 esac

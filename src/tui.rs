@@ -629,7 +629,7 @@ fn render(frame: &mut Frame, app: &App) {
 
 fn render_too_small(frame: &mut Frame) {
     let message = Paragraph::new(vec![
-        Line::styled("gcs", Theme::key()),
+        Line::styled("g", Theme::key()),
         Line::from(""),
         Line::from("Terminal is too small"),
         Line::styled(
@@ -658,7 +658,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, area);
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(" gcs ", Theme::key()),
+            Span::styled(" g ", Theme::key()),
             Span::styled("Git identity profiles", Theme::muted()),
         ])),
         sections[0],

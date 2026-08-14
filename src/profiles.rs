@@ -45,7 +45,7 @@ pub struct ProfileStore {
 
 impl ProfileStore {
     pub fn from_environment() -> Result<Self> {
-        let directory = match env::var_os("GCS_CONFIG_DIR") {
+        let directory = match env::var_os("G_CONFIG_DIR") {
             Some(path) => PathBuf::from(path),
             None => {
                 let base =
@@ -163,7 +163,7 @@ fn default_path(home: &Path) -> PathBuf {
 
 fn ensure_available(profiles: &Profiles, name: &str) -> Result<()> {
     if profiles.profiles.contains_key(name) {
-        bail!("profile '{name}' already exists; use 'gcs edit {name}' to change it");
+        bail!("profile '{name}' already exists; use 'g edit {name}' to change it");
     }
     Ok(())
 }
@@ -268,11 +268,7 @@ mod tests {
         let error = store
             .add("work".into(), profile("New", "new@example.com"))
             .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("use 'gcs edit work' to change it")
-        );
+        assert!(error.to_string().contains("use 'g edit work' to change it"));
         assert_eq!(
             store.get("work").unwrap(),
             profile("Old", "old@example.com")

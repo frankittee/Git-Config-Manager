@@ -1,6 +1,6 @@
 <div align="center">
 
-# gcs
+# g
 
 **Switch Git identities without leaving your terminal.**
 
@@ -13,17 +13,17 @@ A fast, focused CLI for managing Git profiles per repository.
 
 </div>
 
-`gcs` keeps your work, personal, and open-source Git identities separate. Save each identity once, then apply the right name, email, signing key, and SSH host alias to the current repository in one command.
+`g` keeps your work, personal, and open-source Git identities separate. Save each identity once, then apply the right name, email, signing key, and SSH host alias to the current repository in one command.
 
 ```text
-$ gcs use work
+$ g use work
 Successfully write profiles into .git/config
 ```
 
-## Why gcs?
+## Why g?
 
 - **Repository-first** — changes are scoped to the current repository by default, so one project never leaks its identity into another.
-- **Interactive when you want it** — launch the terminal UI with `gcs`, or use explicit subcommands in scripts.
+- **Interactive when you want it** — launch the terminal UI with `g`, or use explicit subcommands in scripts.
 - **Signing-aware** — switches `user.signingkey` and `commit.gpgsign` together.
 - **Multiple GitHub accounts** — optionally rewrites SSH remotes through an alias from `~/.ssh/config`.
 - **Safe updates** — validates first and rolls back Git configuration if a write fails.
@@ -37,18 +37,18 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | sh
 ```
 
-The installer verifies the release checksum and places `gcs` in `~/.local/bin`.
+The installer verifies the release checksum and places `g` in `~/.local/bin`.
 
 ```sh
 # Choose a different installation directory
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | \
-  GCS_INSTALL_DIR="$HOME/bin" sh
+  G_INSTALL_DIR="$HOME/bin" sh
 
 # Install a specific version
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | \
-  GCS_VERSION="0.4.0" sh
+  G_VERSION="0.4.0" sh
 ```
 
 ## Quick start
@@ -56,7 +56,7 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 Create a profile:
 
 ```text
-$ gcs add work
+$ g add work
 Git author name: Ada Lovelace
 Git author email: ada@company.example
 Enable commit signing? [y/N]: y
@@ -69,21 +69,21 @@ Apply it inside a Git repository:
 
 ```sh
 cd my-project
-gcs use work
+g use work
 ```
 
 Check which saved profile matches the repository:
 
 ```sh
-gcs info
+g info
 ```
 
 ## Terminal UI
 
-Run `gcs` without a subcommand to manage profiles from the interactive terminal interface:
+Run `g` without a subcommand to manage profiles from the interactive terminal interface:
 
 ```sh
-gcs
+g
 ```
 
 | Key | Action |
@@ -101,34 +101,34 @@ When adding or editing a profile, use `Tab` to move between fields, `Space` to t
 
 | Command | Description |
 | --- | --- |
-| `gcs` | Open the terminal UI |
-| `gcs add <profile>` | Create a profile |
-| `gcs edit <profile>` | Edit a profile |
-| `gcs list` | List saved profiles |
-| `gcs show <profile>` | Show profile details |
-| `gcs use <profile>` | Apply a profile |
-| `gcs info` | Show the matching active profile |
-| `gcs remove <profile>` | Remove a profile |
+| `g` | Open the terminal UI |
+| `g add <profile>` | Create a profile |
+| `g edit <profile>` | Edit a profile |
+| `g list` | List saved profiles |
+| `g show <profile>` | Show profile details |
+| `g use <profile>` | Apply a profile |
+| `g info` | Show the matching active profile |
+| `g remove <profile>` | Remove a profile |
 
-All profile fields can also be provided as flags, which makes `gcs` convenient in scripts:
+All profile fields can also be provided as flags, which makes `g` convenient in scripts:
 
 ```sh
-gcs add personal \
+g add personal \
   --name "Ada Lovelace" \
   --email "ada@example.com"
 
-gcs add work \
+g add work \
   --name "Ada Lovelace" \
   --email "ada@company.example" \
   --signing-key "ABC123" \
   --ssh-host github-work
 
-gcs edit work --email "new-address@company.example"
-gcs edit work --no-signing
-gcs edit work --no-ssh-host
+g edit work --email "new-address@company.example"
+g edit work --no-signing
+g edit work --no-ssh-host
 ```
 
-Run `gcs <command> --help` for every available option. The terminal UI and prompts require a TTY; in CI, provide both `--name` and `--email` when adding a profile.
+Run `g <command> --help` for every available option. The terminal UI and prompts require a TTY; in CI, provide both `--name` and `--email` when adding a profile.
 
 ## How it works
 
@@ -138,13 +138,13 @@ Profiles are stored in:
 $HOME/.config/git-config-switch/config.toml
 ```
 
-Set `GCS_CONFIG_DIR` to override the containing directory, for example in isolated automation or tests.
+Set `G_CONFIG_DIR` to override the containing directory, for example in isolated automation or tests.
 
-By default, `gcs use` updates the current repository's local Git configuration. When run directly from your home directory, it updates the global Git configuration instead.
+By default, `g use` updates the current repository's local Git configuration. When run directly from your home directory, it updates the global Git configuration instead.
 
-If a profile has a signing key, `gcs use` sets `user.signingkey` and enables `commit.gpgsign`. Applying a profile without a signing key removes both settings from the selected Git configuration scope.
+If a profile has a signing key, `g use` sets `user.signingkey` and enables `commit.gpgsign`. Applying a profile without a signing key removes both settings from the selected Git configuration scope.
 
-If a profile has an `ssh_host`, `gcs` first verifies that the literal `Host` alias exists in `~/.ssh/config` or an included configuration file, then rewrites SSH fetch URLs and explicit push URLs for every remote to use that alias. Include paths support paths relative to `~/.ssh`, absolute paths, `~`, nested includes, and glob wildcards. HTTPS and local URLs are left unchanged. Validation or write failures leave both identity and remote configuration unchanged.
+If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias exists in `~/.ssh/config` or an included configuration file, then rewrites SSH fetch URLs and explicit push URLs for every remote to use that alias. Include paths support paths relative to `~/.ssh`, absolute paths, `~`, nested includes, and glob wildcards. HTTPS and local URLs are left unchanged. Validation or write failures leave both identity and remote configuration unchanged.
 
 <details>
 <summary><strong>Release process</strong></summary>

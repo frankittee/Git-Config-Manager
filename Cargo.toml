@@ -1,9 +1,13 @@
 [package]
-name = "gcs"
+name = "g"
 version = "0.4.4"
 edition = "2024"
 description = "Switch Git identity profiles in the current repository"
 license = "MIT"
+
+[[bin]]
+name = "g"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"

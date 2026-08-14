@@ -66,7 +66,7 @@ jobs:
         if: matrix.linux
         shell: bash
         run: |
-          binary="target/${{ matrix.target }}/release/gcs"
+          binary="target/${{ matrix.target }}/release/g"
           file "$binary"
           if readelf --program-headers "$binary" | grep -q "INTERP"; then
             echo "Linux binary contains a dynamic loader INTERP segment." >&2
@@ -76,14 +76,14 @@ jobs:
       - name: Package binary
         shell: bash
         run: |
-          archive="gcs-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
-          tar -czf "$archive" -C "target/${{ matrix.target }}/release" gcs
+          archive="g-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
+          tar -czf "$archive" -C "target/${{ matrix.target }}/release" g
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: gcs-${{ matrix.target }}
-          path: gcs-*.tar.gz
+          name: g-${{ matrix.target }}
+          path: g-*.tar.gz
           if-no-files-found: error
 
   release:
@@ -97,14 +97,14 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: gcs-*
+          pattern: g-*
           merge-multiple: true
 
       - name: Generate checksums
-        run: sha256sum gcs-*.tar.gz > SHA256SUMS
+        run: sha256sum g-*.tar.gz > SHA256SUMS
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" gcs-*.tar.gz SHA256SUMS --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" g-*.tar.gz SHA256SUMS --generate-notes --verify-tag

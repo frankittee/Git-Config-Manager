@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the command-line executable to `g`.
+
 ## [0.4.4] - 2026-08-14
 
 ### Fixed
@@ -40,15 +44,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Added a Ratatui terminal interface for browsing, creating, editing, deleting, and applying profiles, with responsive layouts and contextual status information. Run `gcs` without a subcommand to open it.
+- Added a Ratatui terminal interface for browsing, creating, editing, deleting, and applying profiles, with responsive layouts and contextual status information. Run `g` without a subcommand to open it.
 - Added an installer for verified Linux and macOS release binaries.
 
 ## [0.2.0] - 2026-07-30
 
 ### Changed
 
-- `gcs use` now applies a profile to the global Git configuration when run directly from the user's home directory and reports the written configuration file after success.
-- Renamed `gcs current` to `gcs info`.
+- `g use` now applies a profile to the global Git configuration when run directly from the user's home directory and reports the written configuration file after success.
+- Renamed `g current` to `g info`.
 
 ## [0.1.1] - 2026-07-30
 

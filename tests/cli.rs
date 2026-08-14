@@ -31,22 +31,22 @@ impl TestContext {
         context
     }
 
-    fn gcs(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_gcs"))
+    fn g(&self, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_g"))
             .args(args)
             .env("HOME", self.home.path())
-            .env("GCS_CONFIG_DIR", self.config.path())
+            .env("G_CONFIG_DIR", self.config.path())
             .env("GIT_CONFIG_GLOBAL", self.config.path().join("gitconfig"))
             .current_dir(self.repository.path())
             .output()
             .unwrap()
     }
 
-    fn gcs_from_home(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_gcs"))
+    fn g_from_home(&self, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_g"))
             .args(args)
             .env("HOME", self.repository.path())
-            .env("GCS_CONFIG_DIR", self.config.path())
+            .env("G_CONFIG_DIR", self.config.path())
             .env("GIT_CONFIG_GLOBAL", self.config.path().join("gitconfig"))
             .current_dir(self.repository.path())
             .output()
@@ -129,13 +129,13 @@ fn assert_success(output: &Output) {
 }
 
 fn add(context: &TestContext, profile: &str, name: &str, email: &str) {
-    assert_success(&context.gcs(&["add", profile, "--name", name, "--email", email]));
+    assert_success(&context.g(&["add", profile, "--name", name, "--email", email]));
 }
 
 #[test]
 fn bare_command_requires_a_terminal() {
     let context = TestContext::new(true);
-    let output = context.gcs(&[]);
+    let output = context.g(&[]);
 
     assert!(!output.status.success());
     assert!(stderr(&output).contains("TUI requires an interactive terminal"));
@@ -147,12 +147,12 @@ fn profile_management_round_trip() {
     add(&context, "work", "Work User", "work@example.com");
     add(&context, "alpha", "Alpha User", "alpha@example.com");
 
-    assert_eq!(stdout(&context.gcs(&["list"])), "alpha\nwork\n");
-    let shown = stdout(&context.gcs(&["show", "work"]));
+    assert_eq!(stdout(&context.g(&["list"])), "alpha\nwork\n");
+    let shown = stdout(&context.g(&["show", "work"]));
     assert!(shown.contains("name=Work User\n"));
     assert!(shown.contains("email=work@example.com\n"));
 
-    let duplicate = context.gcs(&[
+    let duplicate = context.g(&[
         "add",
         "work",
         "--name",
@@ -161,17 +161,17 @@ fn profile_management_round_trip() {
         "new@example.com",
     ]);
     assert!(!duplicate.status.success());
-    assert!(stderr(&duplicate).contains("gcs edit work"));
-    assert!(stdout(&context.gcs(&["show", "work"])).contains("name=Work User"));
+    assert!(stderr(&duplicate).contains("g edit work"));
+    assert!(stdout(&context.g(&["show", "work"])).contains("name=Work User"));
 
-    assert_success(&context.gcs(&["remove", "work"]));
-    assert!(!context.gcs(&["show", "work"]).status.success());
+    assert_success(&context.g(&["remove", "work"]));
+    assert!(!context.g(&["show", "work"]).status.success());
 }
 
 #[test]
 fn edits_profile_fields_non_interactively() {
     let context = TestContext::new(true);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "work",
         "--name",
@@ -182,14 +182,14 @@ fn edits_profile_fields_non_interactively() {
         "OLDKEY",
     ]));
 
-    assert_success(&context.gcs(&["edit", "work", "--email", "new@example.com"]));
-    let shown = stdout(&context.gcs(&["show", "work"]));
+    assert_success(&context.g(&["edit", "work", "--email", "new@example.com"]));
+    let shown = stdout(&context.g(&["show", "work"]));
     assert!(shown.contains("name=Old User\n"));
     assert!(shown.contains("email=new@example.com\n"));
     assert!(shown.contains("signing_key=OLDKEY\n"));
 
-    assert_success(&context.gcs(&["edit", "work", "--name", "New User", "--no-signing"]));
-    let shown = stdout(&context.gcs(&["show", "work"]));
+    assert_success(&context.g(&["edit", "work", "--name", "New User", "--no-signing"]));
+    let shown = stdout(&context.g(&["show", "work"]));
     assert!(shown.contains("name=New User\n"));
     assert!(!shown.contains("signing_key="));
 }
@@ -197,7 +197,7 @@ fn edits_profile_fields_non_interactively() {
 #[test]
 fn edits_and_clears_ssh_host() {
     let context = TestContext::new(true);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "work",
         "--name",
@@ -207,25 +207,25 @@ fn edits_and_clears_ssh_host() {
         "--ssh-host",
         "github-work",
     ]));
-    assert!(stdout(&context.gcs(&["show", "work"])).contains("ssh_host=github-work\n"));
+    assert!(stdout(&context.g(&["show", "work"])).contains("ssh_host=github-work\n"));
 
-    assert_success(&context.gcs(&["edit", "work", "--no-ssh-host"]));
-    assert!(!stdout(&context.gcs(&["show", "work"])).contains("ssh_host="));
+    assert_success(&context.g(&["edit", "work", "--no-ssh-host"]));
+    assert!(!stdout(&context.g(&["show", "work"])).contains("ssh_host="));
 }
 
 #[test]
 fn edit_validates_target_and_non_terminal_input() {
     let context = TestContext::new(true);
-    let missing = context.gcs(&["edit", "missing", "--name", "New User"]);
+    let missing = context.g(&["edit", "missing", "--name", "New User"]);
     assert!(!missing.status.success());
     assert!(stderr(&missing).contains("does not exist"));
 
     add(&context, "work", "Work User", "work@example.com");
-    let interactive = context.gcs(&["edit", "work"]);
+    let interactive = context.g(&["edit", "work"]);
     assert!(!interactive.status.success());
     assert!(stderr(&interactive).contains("interactive input requires a terminal"));
 
-    let conflicting = context.gcs(&["edit", "work", "--signing-key", "KEY", "--no-signing"]);
+    let conflicting = context.g(&["edit", "work", "--signing-key", "KEY", "--no-signing"]);
     assert!(!conflicting.status.success());
     assert!(stderr(&conflicting).contains("cannot be used with"));
 }
@@ -235,7 +235,7 @@ fn applies_profiles_and_reports_current() {
     let context = TestContext::new(true);
     add(&context, "work", "Work User", "work@example.com");
 
-    let use_output = context.gcs(&["use", "work"]);
+    let use_output = context.g(&["use", "work"]);
     assert_success(&use_output);
     assert_eq!(
         stdout(&use_output),
@@ -246,7 +246,7 @@ fn applies_profiles_and_reports_current() {
         context.git_value("user.email").as_deref(),
         Some("work@example.com")
     );
-    assert_eq!(stdout(&context.gcs(&["info"])), "work\n");
+    assert_eq!(stdout(&context.g(&["info"])), "work\n");
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn use_from_home_applies_profile_globally() {
     let context = TestContext::new(false);
     add(&context, "work", "Work User", "work@example.com");
 
-    let use_output = context.gcs_from_home(&["use", "work"]);
+    let use_output = context.g_from_home(&["use", "work"]);
     assert_success(&use_output);
     assert_eq!(
         stdout(&use_output),
@@ -276,7 +276,7 @@ fn use_from_home_applies_profile_globally() {
 #[test]
 fn signing_is_enabled_and_then_cleared() {
     let context = TestContext::new(true);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "signed",
         "--name",
@@ -288,7 +288,7 @@ fn signing_is_enabled_and_then_cleared() {
     ]));
     add(&context, "plain", "Plain User", "plain@example.com");
 
-    assert_success(&context.gcs(&["use", "signed"]));
+    assert_success(&context.g(&["use", "signed"]));
     assert_eq!(
         context.git_value("user.signingkey").as_deref(),
         Some("ABC123")
@@ -296,7 +296,7 @@ fn signing_is_enabled_and_then_cleared() {
     assert_eq!(context.git_value("commit.gpgsign").as_deref(), Some("true"));
     assert_eq!(context.git_value("gpg.format").as_deref(), Some("ssh"));
 
-    assert_success(&context.gcs(&["use", "plain"]));
+    assert_success(&context.g(&["use", "plain"]));
     assert_eq!(context.git_value("user.signingkey"), None);
     assert_eq!(context.git_value("commit.gpgsign"), None);
     assert_eq!(context.git_value("gpg.format"), None);
@@ -332,7 +332,7 @@ fn use_rewrites_all_ssh_remote_urls() {
         "upstream",
         "https://github.com/upstream/project.git",
     ]);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "work",
         "--name",
@@ -343,7 +343,7 @@ fn use_rewrites_all_ssh_remote_urls() {
         "github-work",
     ]));
 
-    assert_success(&context.gcs(&["use", "work"]));
+    assert_success(&context.g(&["use", "work"]));
 
     assert_eq!(
         context.git_values("remote.origin.url"),
@@ -378,7 +378,7 @@ fn included_ssh_host_is_accepted() {
         "git@github.com:owner/project.git",
     ]);
     context.git(&["config", "--local", "user.name", "Original User"]);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "work",
         "--name",
@@ -389,7 +389,7 @@ fn included_ssh_host_is_accepted() {
         "github-work",
     ]));
 
-    assert_success(&context.gcs(&["use", "work"]));
+    assert_success(&context.g(&["use", "work"]));
     assert_eq!(context.git_value("user.name").as_deref(), Some("Work User"));
     assert_eq!(
         context.git_values("remote.origin.url"),
@@ -408,7 +408,7 @@ fn missing_or_non_literal_ssh_host_preserves_configuration() {
         "git@github.com:owner/project.git",
     ]);
     context.git(&["config", "--local", "user.name", "Original User"]);
-    assert_success(&context.gcs(&[
+    assert_success(&context.g(&[
         "add",
         "work",
         "--name",
@@ -419,7 +419,7 @@ fn missing_or_non_literal_ssh_host_preserves_configuration() {
         "work-main",
     ]));
 
-    let output = context.gcs(&["use", "work"]);
+    let output = context.g(&["use", "work"]);
     assert!(!output.status.success());
     assert!(stderr(&output).contains("not declared as a literal Host"));
     assert_eq!(
@@ -435,17 +435,17 @@ fn missing_or_non_literal_ssh_host_preserves_configuration() {
 #[test]
 fn unmanaged_and_failure_paths_are_clear() {
     let context = TestContext::new(true);
-    let unmanaged = context.gcs(&["info"]);
+    let unmanaged = context.g(&["info"]);
     assert_success(&unmanaged);
     assert_eq!(stdout(&unmanaged), "unmanaged\n");
-    assert!(!context.gcs(&["use", "missing"]).status.success());
+    assert!(!context.g(&["use", "missing"]).status.success());
 
     let outside = TestContext::new(false);
     add(&outside, "work", "Work User", "work@example.com");
-    let use_output = outside.gcs(&["use", "work"]);
+    let use_output = outside.g(&["use", "work"]);
     assert!(!use_output.status.success());
     assert!(stderr(&use_output).contains("not inside a Git repository"));
-    let info_output = outside.gcs(&["info"]);
+    let info_output = outside.g(&["info"]);
     assert!(!info_output.status.success());
     assert!(stderr(&info_output).contains("not inside a Git repository"));
 }
@@ -453,7 +453,7 @@ fn unmanaged_and_failure_paths_are_clear() {
 #[test]
 fn required_arguments_are_enforced() {
     let context = TestContext::new(true);
-    let output = context.gcs(&["add", "incomplete", "--name", "Name"]);
+    let output = context.g(&["add", "incomplete", "--name", "Name"]);
     assert!(!output.status.success());
     assert!(stderr(&output).contains("interactive input requires a terminal"));
     assert!(stderr(&output).contains("--name and --email"));
@@ -464,9 +464,9 @@ fn duplicate_is_rejected_before_interactive_input() {
     let context = TestContext::new(true);
     add(&context, "work", "Work User", "work@example.com");
 
-    let output = context.gcs(&["add", "work"]);
+    let output = context.g(&["add", "work"]);
     assert!(!output.status.success());
-    assert!(stderr(&output).contains("gcs edit work"));
+    assert!(stderr(&output).contains("g edit work"));
     assert!(!stderr(&output).contains("interactive input requires a terminal"));
 }
 

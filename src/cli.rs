@@ -2,10 +2,10 @@ use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "gcs",
+    name = "g",
     version,
     about = "Switch Git identity profiles in the current repository",
-    after_help = "Examples:\n  gcs add work\n  gcs edit work\n  gcs edit work --email new@example.com\n  gcs add personal --name \"Ada Lovelace\" --email ada@example.com\n  gcs use work\n  gcs info"
+    after_help = "Examples:\n  g add work\n  g edit work\n  g edit work --email new@example.com\n  g add personal --name \"Ada Lovelace\" --email ada@example.com\n  g use work\n  g info"
 )]
 pub struct Cli {
     #[command(subcommand)]

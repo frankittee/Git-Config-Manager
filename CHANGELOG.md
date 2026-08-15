@@ -74,14 +74,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added transactional repository-local Git configuration updates with rollback.
 - Added tagged GitHub releases for Linux x86_64/ARM64 musl and macOS Intel/Apple Silicon.
 
-[Unreleased]: https://github.com/frankittee/Git-Config-Switch/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.4...v0.5.0
-[0.4.4]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.3...v0.4.4
-[0.4.3]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/frankittee/Git-Config-Switch/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/frankittee/Git-Config-Switch/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/frankittee/Git-Config-Switch/releases/tag/v0.1.0
+[Unreleased]: https://github.com/frankittee/Git-Config-Manager/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/frankittee/Git-Config-Manager/compare/v0.4.4...v0.5.0
+[0.4.4]: https://github.com/frankittee/Git-Config-Manager/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/frankittee/Git-Config-Manager/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/frankittee/Git-Config-Manager/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/frankittee/Git-Config-Manager/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/frankittee/Git-Config-Manager/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/frankittee/Git-Config-Manager/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/frankittee/Git-Config-Manager/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/frankittee/Git-Config-Manager/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/frankittee/Git-Config-Manager/releases/tag/v0.1.0

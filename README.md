@@ -6,8 +6,8 @@
 
 A fast, focused CLI for managing Git profiles per repository.
 
-[![Release](https://img.shields.io/github/v/release/frankittee/Git-Config-Switch?style=flat-square)](https://github.com/frankittee/Git-Config-Switch/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/frankittee/Git-Config-Switch/release.yml?style=flat-square&label=release)](https://github.com/frankittee/Git-Config-Switch/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/frankittee/Git-Config-Manager?style=flat-square)](https://github.com/frankittee/Git-Config-Manager/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/frankittee/Git-Config-Manager/release.yml?style=flat-square&label=release)](https://github.com/frankittee/Git-Config-Manager/actions/workflows/release.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-dea584?style=flat-square)](https://www.rust-lang.org/)
 
@@ -34,7 +34,7 @@ Install the latest release on Linux or macOS:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | sh
+  https://raw.githubusercontent.com/frankittee/Git-Config-Manager/main/install.sh | sh
 ```
 
 The installer verifies the release checksum and places `g` in `~/.local/bin`.
@@ -42,12 +42,12 @@ The installer verifies the release checksum and places `g` in `~/.local/bin`.
 ```sh
 # Choose a different installation directory
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | \
+  https://raw.githubusercontent.com/frankittee/Git-Config-Manager/main/install.sh | \
   G_INSTALL_DIR="$HOME/bin" sh
 
 # Install a specific version
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/frankittee/Git-Config-Switch/main/install.sh | \
+  https://raw.githubusercontent.com/frankittee/Git-Config-Manager/main/install.sh | \
   G_VERSION="0.4.0" sh
 ```
 

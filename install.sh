@@ -2,7 +2,7 @@
 
 set -eu
 
-repository="frankittee/Git-Config-Switch"
+repository="frankittee/Git-Config-Manager"
 install_dir="${G_INSTALL_DIR:-${HOME}/.local/bin}"
 version="${G_VERSION:-latest}"
 

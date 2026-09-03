@@ -7,7 +7,6 @@ mod tui;
 use std::io::{self, IsTerminal};
 
 use anyhow::{Result, bail};
-use clap::Parser;
 
 fn main() {
     if let Err(error) = run() {

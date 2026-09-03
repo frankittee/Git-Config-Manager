@@ -5,7 +5,7 @@
 This repository contains the Rust CLI binary `g`.
 
 - `src/main.rs` parses commands and coordinates profile and Git operations.
-- `src/cli.rs` defines the `clap` command-line interface.
+- `src/cli.rs` defines the `usage-rs` command-line interface.
 - `src/profiles.rs` validates and atomically persists profiles.
 - `src/git.rs` reads and updates repository-local Git configuration.
 - `src/input.rs` implements interactive prompts.
@@ -29,6 +29,14 @@ mise x -- cargo build --release --locked      # Build an optimized, locked relea
 
 Run formatting with `mise x -- cargo fmt` before committing. Never edit `Cargo.lock` manually except for an intentional package-version change.
 
+Install the Conventional Commit message hook once after cloning:
+
+```sh
+mise x -- prek install --hook-type commit-msg
+```
+
+The hook rejects non-conforming messages. Version bumps follow Conventional Commits: `fix` creates a patch release, `feat` a minor release, and a breaking change a major release.
+
 ## Coding Style & Naming Conventions
 
 Follow standard `rustfmt` output with four-space indentation. Use `snake_case` for modules, functions, variables, and test names; use `PascalCase` for structs and enums. Keep functions small, behavior explicit, and error messages actionable. Prefer `anyhow::Context` at I/O and process boundaries. Avoid unnecessary abstractions or new dependencies for small features.
@@ -51,4 +59,4 @@ Run GitHub CLI commands through mise, for example `mise x -- gh auth status`, ra
 
 ## Release Safety
 
-Releases are triggered only by `v*` tags. Update both `Cargo.toml` and `Cargo.lock`, commit the version change, and ensure the tag exactly matches it before pushing.
+Releases are triggered only by `v*` tags. Run `mise x -- cog bump --auto` to calculate the next version, update `Cargo.toml`, `Cargo.lock`, and `CHANGELOG.md`, create the release commit, and tag it. Then run `git push --follow-tags`. Ensure the tag exactly matches the package version before pushing.

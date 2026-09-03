@@ -152,9 +152,9 @@ If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias
 Pushing a `v*` tag builds Linux x86_64/ARM64 musl binaries and native macOS Intel/Apple Silicon binaries. The tag must match the version in `Cargo.toml`.
 
 ```sh
-# After updating the package version and committing it:
-git tag v0.4.0
-git push origin v0.4.0
+# Creates the version commit, updates Cargo.toml and Cargo.lock, generates CHANGELOG.md, and creates a v* tag.
+mise x -- cog bump --auto
+git push --follow-tags
 ```
 
 Normal branch pushes do not trigger release builds.

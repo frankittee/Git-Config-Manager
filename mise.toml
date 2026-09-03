@@ -1,2 +1,5 @@
 [tools]
+cocogitto = "latest"
+"cargo:cargo-edit" = "latest"
+prek = "latest"
 rust = "latest"

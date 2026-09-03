@@ -1,34 +1,36 @@
-use clap::{Parser, Subcommand};
+use usage::{Cli as CliParser, Subcommands};
 
-#[derive(Debug, Parser)]
-#[command(
-    name = "g",
+#[derive(Debug, CliParser)]
+#[usage(
+    bin = "g",
     version,
     about = "Switch Git identity profiles in the current repository",
-    after_help = "Examples:\n  g add work\n  g edit work\n  g edit work --email new@example.com\n  g add personal --name \"Ada Lovelace\" --email ada@example.com\n  g use work\n  g info"
+    after_help = "Examples:\n  g add work\n  g edit work\n  g edit work --email new@example.com\n  g add personal --name \"Ada Lovelace\" --email ada@example.com\n  g use work\n  g info",
+    unknown_flags = "error",
+    args_override_self = false
 )]
 pub struct Cli {
-    #[command(subcommand)]
+    #[usage(subcommand)]
     pub command: Option<Command>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommands)]
 pub enum Command {
     /// Add a new profile
     Add {
         /// Unique profile name
         profile: String,
         /// Git author name
-        #[arg(long)]
+        #[usage(long)]
         name: Option<String>,
         /// Git author email
-        #[arg(long)]
+        #[usage(long)]
         email: Option<String>,
         /// Signing key; also enables commit.gpgsign
-        #[arg(long)]
+        #[usage(long)]
         signing_key: Option<String>,
         /// SSH host alias from ~/.ssh/config
-        #[arg(long)]
+        #[usage(long)]
         ssh_host: Option<String>,
     },
     /// Edit an existing profile
@@ -36,22 +38,22 @@ pub enum Command {
         /// Saved profile name
         profile: String,
         /// Replace the Git author name
-        #[arg(long)]
+        #[usage(long)]
         name: Option<String>,
         /// Replace the Git author email
-        #[arg(long)]
+        #[usage(long)]
         email: Option<String>,
         /// Set the signing key and enable commit signing
-        #[arg(long, conflicts_with = "no_signing")]
+        #[usage(long, conflicts = "no_signing")]
         signing_key: Option<String>,
         /// Remove the signing key and disable commit signing
-        #[arg(long)]
+        #[usage(long)]
         no_signing: bool,
         /// Set the SSH host alias from ~/.ssh/config
-        #[arg(long, conflicts_with = "no_ssh_host")]
+        #[usage(long, conflicts = "no_ssh_host")]
         ssh_host: Option<String>,
         /// Remove the SSH host alias
-        #[arg(long)]
+        #[usage(long)]
         no_ssh_host: bool,
     },
     /// List saved profile names

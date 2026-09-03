@@ -1,0 +1,19 @@
+tag_prefix = "v"
+from_latest_tag = true
+ignore_merge_commits = true
+
+pre_bump_hooks = [
+  "mise x -- cargo fmt --check",
+  "mise x -- cargo clippy --all-targets -- -D warnings",
+  "mise x -- cargo test",
+  "mise x -- cargo set-version {{version}}",
+  "mise x -- cargo check --release",
+  "git add :/Cargo.lock",
+]
+
+[changelog]
+path = "CHANGELOG.md"
+template = "remote"
+remote = "github.com"
+owner = "frankittee"
+repository = "Git-Config-Manager"

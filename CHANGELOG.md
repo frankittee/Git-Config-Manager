@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - - -
+## [v0.6.0](https://github.com/frankittee/Git-Config-Manager/compare/81965f560517eec28d5f5468a3bdd9412db587ac..v0.6.0) - 2026-09-03
+#### Features
+- migrate CLI to usage-rs - ([f534c91](https://github.com/frankittee/Git-Config-Manager/commit/f534c916443c53fb6e2da4e7c04f6695c35bafd4)) - frankittee
+#### Documentation
+- update repository links - ([041809e](https://github.com/frankittee/Git-Config-Manager/commit/041809edf746a0b4d6dcbb0522fc1db2f546a791)) - frankittee
+#### Miscellaneous Chores
+- remove local GitHub token - ([81965f5](https://github.com/frankittee/Git-Config-Manager/commit/81965f560517eec28d5f5468a3bdd9412db587ac)) - frankittee
+
+- - -
+
 
 ## [0.5.0] - 2026-08-15
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# g
+<img src="assets/readme-title.svg" alt="Git-Config-Manager" width="560">
 
 **Switch Git identities without leaving your terminal.**
 

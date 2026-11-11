@@ -54,17 +54,36 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 
 ## Quick start
 
-Create a profile:
+Create a profile. In a terminal, `g add` shows an inline form below the prompt (no fullscreen) listing every field at once:
 
 ```text
 $ g add work
-Git author name: Ada Lovelace
-Git author email: ada@company.example
-Enable commit signing? [y/N]: y
-Signing key: ABC123
-SSH host alias (leave blank to skip): github-work
-work
+  Git author name
+  > Ada Lovelace
+
+  Git author email
+  > ada@company.example
+
+  Commit signing
+  > Yes / No
+
+  Signing key
+  > ABC123
+
+│ SSH host alias
+│ > github-work
+    available: github-work, github-home
+
+  tab complete  enter submit  shift+tab back  esc cancel
 ```
+
+Keys: `enter` validates and moves to the next field (submits on the last), `tab`/`down` move forward (`tab` completes an SSH host alias on the last field), `shift+tab`/`up` move back, `←`/`→`/`space`/`y`/`n` change the signing toggle, `ctrl+u` clears a field, and `esc` or `ctrl+c` cancels with `error: cancelled` without changing anything. The signing key field only appears when signing is `Yes`. Flags such as `--name` prefill the form. After submitting, the form is cleared and a success line is printed:
+
+```text
+✓ Saved profile `work`
+```
+
+`g edit work` without options shows the same form prefilled with the current values and ends with `✓ Updated profile `work``. The success line goes to stderr; stdout receives the bare profile name only when it is redirected, and non-terminal or flag-only runs print just the name as before.
 
 Apply it inside a Git repository:
 

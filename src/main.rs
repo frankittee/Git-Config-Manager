@@ -1,4 +1,5 @@
 mod cli;
+mod form;
 mod git;
 mod input;
 mod profiles;
@@ -9,6 +10,8 @@ use std::{
     io::{self, IsTerminal, Read},
     path::Path,
 };
+
+use crossterm::style::Stylize;
 
 use anyhow::{Context, Result, bail};
 
@@ -47,9 +50,27 @@ fn run() -> Result<()> {
                 if !io::stdin().is_terminal() {
                     bail!("interactive input requires a terminal; provide both --name and --email");
                 }
-                let mut stdin = io::stdin().lock();
-                let mut stderr = io::stderr().lock();
-                input::collect_profile(name, email, signing_key, ssh_host, &mut stdin, &mut stderr)?
+                if io::stderr().is_terminal() {
+                    let signing = signing_key.is_some();
+                    let initial = profiles::Profile {
+                        name: name.unwrap_or_default(),
+                        email: email.unwrap_or_default(),
+                        signing_key,
+                        ssh_host,
+                    };
+                    form::run(form::Form::new(initial, signing, ssh_aliases()))?
+                } else {
+                    let mut stdin = io::stdin().lock();
+                    let mut stderr = io::stderr().lock();
+                    input::collect_profile(
+                        name,
+                        email,
+                        signing_key,
+                        ssh_host,
+                        &mut stdin,
+                        &mut stderr,
+                    )?
+                }
             } else {
                 profiles::Profile {
                     name: name.expect("name is present in non-interactive mode"),
@@ -59,7 +80,7 @@ fn run() -> Result<()> {
                 }
             };
             store.add(profile.clone(), value)?;
-            println!("{profile}");
+            report_saved(&profile, "Saved", interactive);
         }
         Some(cli::Command::Edit {
             profile,
@@ -98,12 +119,17 @@ fn run() -> Result<()> {
                         "interactive input requires a terminal; provide an edit option such as --name or --email"
                     );
                 }
-                let mut stdin = io::stdin().lock();
-                let mut stderr = io::stderr().lock();
-                input::edit_profile(current, &mut stdin, &mut stderr)?
+                if io::stderr().is_terminal() {
+                    let signing = current.signing_key.is_some();
+                    form::run(form::Form::new(current, signing, ssh_aliases()))?
+                } else {
+                    let mut stdin = io::stdin().lock();
+                    let mut stderr = io::stderr().lock();
+                    input::edit_profile(current, &mut stdin, &mut stderr)?
+                }
             };
             store.update(&profile, value)?;
-            println!("{profile}");
+            report_saved(&profile, "Updated", !has_options);
         }
         Some(cli::Command::List) => {
             let names = store.list()?;
@@ -168,6 +194,25 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn ssh_aliases() -> Vec<String> {
+    git::ssh_host_aliases().unwrap_or_default()
+}
+
+/// Flag-driven runs print the bare profile name on stdout. After the interactive
+/// form (stdin and stderr are terminals) a green success line goes to stderr
+/// instead; stdout still gets the name when it is redirected, so `$(g add x)` works.
+fn report_saved(profile: &str, verb: &str, interactive: bool) {
+    let form_shown = interactive && io::stdin().is_terminal() && io::stderr().is_terminal();
+    if form_shown {
+        eprintln!("{}", format!("✓ {verb} profile `{profile}`").green().bold());
+        if !io::stdout().is_terminal() {
+            println!("{profile}");
+        }
+    } else {
+        println!("{profile}");
+    }
 }
 
 fn read_import(file: Option<&Path>) -> Result<String> {

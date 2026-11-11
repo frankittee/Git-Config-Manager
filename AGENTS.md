@@ -8,7 +8,8 @@ This repository contains the Rust CLI binary `g`.
 - `src/cli.rs` defines the `usage-rs` command-line interface.
 - `src/profiles.rs` validates and atomically persists profiles.
 - `src/git.rs` reads and updates repository-local Git configuration.
-- `src/input.rs` implements interactive prompts.
+- `src/input.rs` implements line-based interactive prompts used when no terminal is available.
+- `src/form.rs` implements the inline ratatui form for interactive `add` and `edit`; its state and key handling are pure and unit-tested.
 - `skills/g/SKILL.md` is the agent skill that documents safe `g` usage; keep it in sync with the CLI.
 - `.github/workflows/ci.yml` runs formatting, Clippy, and tests on Linux and macOS.
 - `tests/cli.rs` contains end-to-end CLI tests using isolated temporary directories and Git repositories.

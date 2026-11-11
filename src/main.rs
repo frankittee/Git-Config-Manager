@@ -1,8 +1,8 @@
 mod cli;
-mod form;
 mod git;
 mod input;
 mod profiles;
+mod prompt;
 mod tui;
 
 use std::{
@@ -58,7 +58,7 @@ fn run() -> Result<()> {
                         signing_key,
                         ssh_host,
                     };
-                    form::run(form::Form::new(initial, signing, ssh_aliases()))?
+                    prompt::run(initial, signing, ssh_aliases())?
                 } else {
                     let mut stdin = io::stdin().lock();
                     let mut stderr = io::stderr().lock();
@@ -121,7 +121,7 @@ fn run() -> Result<()> {
                 }
                 if io::stderr().is_terminal() {
                     let signing = current.signing_key.is_some();
-                    form::run(form::Form::new(current, signing, ssh_aliases()))?
+                    prompt::run(current, signing, ssh_aliases())?
                 } else {
                     let mut stdin = io::stdin().lock();
                     let mut stderr = io::stderr().lock();
@@ -201,11 +201,11 @@ fn ssh_aliases() -> Vec<String> {
 }
 
 /// Flag-driven runs print the bare profile name on stdout. After the interactive
-/// form (stdin and stderr are terminals) a green success line goes to stderr
+/// prompts (stdin and stderr are terminals) a green success line goes to stderr
 /// instead; stdout still gets the name when it is redirected, so `$(g add x)` works.
 fn report_saved(profile: &str, verb: &str, interactive: bool) {
-    let form_shown = interactive && io::stdin().is_terminal() && io::stderr().is_terminal();
-    if form_shown {
+    let prompted = interactive && io::stdin().is_terminal() && io::stderr().is_terminal();
+    if prompted {
         eprintln!("{}", format!("✓ {verb} profile `{profile}`").green().bold());
         if !io::stdout().is_terminal() {
             println!("{profile}");

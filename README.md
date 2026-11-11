@@ -56,36 +56,27 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 
 ## Quick start
 
-Create a profile. In a terminal, `g add` shows an inline form below the prompt (no fullscreen) listing every field at once:
+Create a profile. In a terminal, `g add` asks for each field in turn with inline [demand](https://github.com/jdx/demand) prompts below the shell prompt (no fullscreen); answered fields collapse to a single summary line:
 
 ```text
 $ g add work
-  Git author name
-  > Ada Lovelace
-
-  Git author email
-  > ada@company.example
-
-  Commit signing
-  > Yes / No
-
-  Signing key
-  > ABC123
-
-│ SSH host alias
-│ > github-work
-    available: github-work, github-home
-
-  tab complete  enter submit  shift+tab back  esc cancel
+Git author name Ada Lovelace
+Git author email ada@company.example
+Enable commit signing? Yes
+Signing key ~/.ssh/id_ed25519.pub
+SSH host alias
+Leave blank to skip · tab completes: github-personal, github-work
+> github-w
+ → github-work
 ```
 
-Keys: `enter` validates and moves to the next field (submits on the last), `tab`/`down` move forward (`tab` completes an SSH host alias on the last field), `shift+tab`/`up` move back, `←`/`→`/`space`/`y`/`n` change the signing toggle, `ctrl+u` clears a field, and `esc` or `ctrl+c` cancels with `error: cancelled` without changing anything. The signing key field only appears when signing is `Yes`. Flags such as `--name` prefill the form. After submitting, the form is cleared and a success line is printed:
+Keys: `enter` validates and submits the current field (empty required fields show an inline error), `←`/`→` toggle the signing confirmation and `y`/`n` answer it directly, `tab` completes the highlighted SSH host alias from `~/.ssh/config` (`↑`/`↓` move through the suggestions), `ctrl+u` clears a field, and `esc` or `ctrl+c` cancels with `error: cancelled` without changing anything. The signing key is only asked for when signing is enabled. Flags such as `--name` prefill the prompts. After the last field a success line is printed:
 
 ```text
 ✓ Saved profile `work`
 ```
 
-`g edit work` without options shows the same form prefilled with the current values and ends with `✓ Updated profile `work``. The success line goes to stderr; stdout receives the bare profile name only when it is redirected, and non-terminal or flag-only runs print just the name as before.
+`g edit work` without options shows the same prompts prefilled with the current values (clear the SSH host alias to remove it) and ends with `✓ Updated profile `work``. The success line goes to stderr; stdout receives the bare profile name only when it is redirected, and non-terminal or flag-only runs print just the name as before.
 
 Apply it inside a Git repository:
 

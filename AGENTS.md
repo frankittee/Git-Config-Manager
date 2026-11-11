@@ -9,7 +9,7 @@ This repository contains the Rust CLI binary `g`.
 - `src/profiles.rs` validates and atomically persists profiles.
 - `src/git.rs` reads and updates repository-local Git configuration.
 - `src/input.rs` implements line-based interactive prompts used when no terminal is available.
-- `src/form.rs` implements the inline ratatui form for interactive `add` and `edit`; its state and key handling are pure and unit-tested.
+- `src/prompt.rs` implements the interactive `add` and `edit` prompts with [demand](https://github.com/jdx/demand); its validators and alias suggestions are pure and unit-tested.
 - `skills/g/SKILL.md` is the agent skill that documents safe `g` usage; keep it in sync with the CLI.
 - `.github/workflows/ci.yml` runs formatting, Clippy, and tests on Linux and macOS.
 - `tests/cli.rs` contains end-to-end CLI tests using isolated temporary directories and Git repositories.
@@ -64,7 +64,7 @@ Run GitHub CLI commands through mise, for example `mise x -- gh auth status`, ra
 
 ## Demo Recording
 
-`demo/demo.tape` is a [VHS](https://github.com/charmbracelet/vhs) script that records `demo/demo.gif` for the README. Regenerate it with `mise run demo` after user-visible CLI or TUI changes. VHS needs `ttyd` on `PATH` (for example `brew install ttyd`); the task fetches `vhs` and `ffmpeg` through mise. The tape runs with a throwaway `HOME` (containing a fake `~/.ssh/config` with `github-personal` and `github-work`), `G_CONFIG_DIR`, and `/tmp/my-project`, so it never touches or reveals real profiles or SSH hosts. It waits for the form and TUI to render before typing, because keystrokes sent before raw mode is enabled are echoed by the shell instead.
+`demo/demo.tape` is a [VHS](https://github.com/charmbracelet/vhs) script that records `demo/demo.gif` for the README. Regenerate it with `mise run demo` after user-visible CLI or TUI changes. VHS needs `ttyd` on `PATH` (for example `brew install ttyd`); the task fetches `vhs` and `ffmpeg` through mise. The tape runs with a throwaway `HOME` (containing a fake `~/.ssh/config` with `github-personal` and `github-work`), `G_CONFIG_DIR`, and `/tmp/my-project`, so it never touches or reveals real profiles or SSH hosts. It waits for the prompts and TUI to render before typing, because keystrokes sent before raw mode is enabled are echoed by the shell instead.
 
 ## Release Safety
 

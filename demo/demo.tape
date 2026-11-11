@@ -24,11 +24,11 @@ Wait+Screen@20s /(?s)\A\s*❯\s*\z/
 Sleep 300ms
 Show
 
-# Interactive add with the inline form
+# Interactive add with the demand prompts
 Type "g add work"
 Sleep 300ms
 Enter
-Wait+Screen@10s /enter next/
+Wait+Screen@10s /Git author name/
 Sleep 500ms
 Type "Ada Lovelace"
 Sleep 300ms
@@ -38,7 +38,7 @@ Type "ada@company.example"
 Sleep 300ms
 Enter
 Sleep 700ms
-Right
+Left
 Sleep 700ms
 Enter
 Sleep 500ms

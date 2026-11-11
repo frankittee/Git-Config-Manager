@@ -13,6 +13,7 @@ path = "src/main.rs"
 anyhow = "1.0"
 usage = { package = "usage-rs", version = "6", features = ["completions"] }
 crossterm = "0.28"
+demand = "2.4"
 directories = "6.0"
 ratatui = "0.29"
 serde = { version = "1.0", features = ["derive"] }

@@ -28,8 +28,18 @@ echo "Releasing $tag (current v$current)"
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
-cargo set-version "$version"
+# Update the [package] version in Cargo.toml; cargo check then syncs Cargo.lock.
+VERSION="$version" awk '
+    /^\[/ { in_package = ($0 == "[package]") }
+    in_package && !done && /^version[[:space:]]*=/ { print "version = \"" ENVIRON["VERSION"] "\""; done = 1; next }
+    { print }
+' Cargo.toml >Cargo.toml.tmp
+mv Cargo.toml.tmp Cargo.toml
 cargo check --release
+if [ "$(cargo pkgid | sed 's/.*[#@]//')" != "$version" ]; then
+    echo "error: failed to set Cargo.toml version to $version" >&2
+    exit 1
+fi
 
 section="$(git cliff --unreleased --tag "$tag" --strip all)"
 if [ -z "$section" ]; then

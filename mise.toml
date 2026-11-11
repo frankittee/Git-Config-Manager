@@ -1,5 +1,4 @@
 [tools]
-"cargo:cargo-edit" = "latest"
 git-cliff = "latest"
 hk = "latest"
 pkl = "latest"

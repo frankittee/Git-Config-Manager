@@ -15,6 +15,10 @@ run = "hk check --all"
 description = "Apply formatting and Clippy fixes through hk"
 run = "hk fix --all"
 
+[tasks.demo]
+description = "Record demo/demo.gif with VHS (requires ttyd, e.g. brew install ttyd)"
+run = ["cargo build --release", "mise x vhs@latest ffmpeg@latest -- vhs demo/demo.tape"]
+
 [tasks.release]
 description = "Bump the version, update CHANGELOG.md, commit, and tag"
 run = "bash scripts/release.sh"

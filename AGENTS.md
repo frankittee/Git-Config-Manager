@@ -62,6 +62,10 @@ Merge pull requests with squash merge by default so all changes from a PR become
 
 Run GitHub CLI commands through mise, for example `mise x -- gh auth status`, rather than invoking `gh` directly.
 
+## Demo Recording
+
+`demo/demo.tape` is a [VHS](https://github.com/charmbracelet/vhs) script that records `demo/demo.gif` for the README. Regenerate it with `mise run demo` after user-visible CLI or TUI changes. VHS needs `ttyd` on `PATH` (for example `brew install ttyd`); the task fetches `vhs` and `ffmpeg` through mise. The tape runs with a throwaway `HOME` (containing a fake `~/.ssh/config` with `github-personal` and `github-work`), `G_CONFIG_DIR`, and `/tmp/my-project`, so it never touches or reveals real profiles or SSH hosts. It waits for the form and TUI to render before typing, because keystrokes sent before raw mode is enabled are echoed by the shell instead.
+
 ## Release Safety
 
 Releases are triggered only by `v*` tags. Run `mise run release` to calculate the next version with git-cliff, run fmt/Clippy/tests, update `Cargo.toml`, `Cargo.lock`, and `CHANGELOG.md`, create the `chore(version): vX.Y.Z` release commit, and tag it. Pass an explicit version with `mise run release 1.2.3` when needed. The script only prepends the new section to `CHANGELOG.md`, so never rewrite older entries. Then run `git push --follow-tags`. Ensure the tag exactly matches the package version before pushing.

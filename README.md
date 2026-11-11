@@ -16,6 +16,8 @@ A fast, focused CLI for managing Git profiles per repository.
 
 `g` keeps your work, personal, and open-source Git identities separate. Save each identity once, then apply the right name, email, signing key, and SSH host alias to the current repository in one command.
 
+![g demo](demo/demo.gif)
+
 ```text
 $ g use work
 Applied 'work' to .git/config

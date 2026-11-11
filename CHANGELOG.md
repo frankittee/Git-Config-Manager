@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0](https://github.com/frankittee/Git-Config-Manager/compare/v0.6.0..v1.0.0) - 2026-11-11
+
+#### Features
+- Add -C, unuse, import/export, shell completion and agent skill - ([f81a332](https://github.com/frankittee/Git-Config-Manager/commit/f81a332e57e4607a745bac2f27f40f6b9274b3e9)) - frankittee
+
+#### Documentation
+- Add custom readme title - ([bb6e5c1](https://github.com/frankittee/Git-Config-Manager/commit/bb6e5c11ca14e6f8ef6ca780f914f197c7b0ab39)) - frankittee
+
+#### Build System
+- Replace prek and cog with hk and git-cliff - ([3b5294d](https://github.com/frankittee/Git-Config-Manager/commit/3b5294dcec3f7ff0d7b98547c82f634b5b2cc635)) - frankittee
+- Drop cargo-edit from release script - ([90f3896](https://github.com/frankittee/Git-Config-Manager/commit/90f3896aca7f4adc037cc848a34419c744390c72)) - frankittee
+
+#### Continuous Integration
+- Run fmt, clippy and tests on push and pull requests - ([91316e6](https://github.com/frankittee/Git-Config-Manager/commit/91316e6976a1149f836d7e68df8f4fe8ccdb5734)) - frankittee
+
 ## [v0.6.0](https://github.com/frankittee/Git-Config-Manager/compare/81965f560517eec28d5f5468a3bdd9412db587ac..v0.6.0) - 2026-09-03
 #### Features
 - migrate CLI to usage-rs - ([f534c91](https://github.com/frankittee/Git-Config-Manager/commit/f534c916443c53fb6e2da4e7c04f6695c35bafd4)) - frankittee

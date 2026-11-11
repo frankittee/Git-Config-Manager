@@ -38,6 +38,10 @@ case "$(uname -m)" in
         ;;
 esac
 
+if [ "$os" = "apple-darwin" ] && [ "$arch" = "x86_64" ] && [ "$version" = "latest" ]; then
+    fail "Intel Macs are no longer built after v1.2.0; rerun with G_VERSION=1.2.0 or build from source with cargo install --git https://github.com/${repository}"
+fi
+
 if [ "$version" = "latest" ]; then
     release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
         "https://github.com/${repository}/releases/latest")"

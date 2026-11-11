@@ -211,7 +211,7 @@ If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias
 <details>
 <summary><strong>Release process</strong></summary>
 
-Pushing a `v*` tag builds Linux x86_64/ARM64 musl binaries and native macOS Intel/Apple Silicon binaries. The tag must match the version in `Cargo.toml`.
+Pushing a `v*` tag builds Linux x86_64/ARM64 musl binaries and native macOS Apple Silicon binaries. Intel Macs are no longer built after v1.2.0; install v1.2.0 with `G_VERSION=1.2.0` or build from source with `cargo install --git https://github.com/frankittee/Git-Config-Manager`. The tag must match the version in `Cargo.toml`.
 
 ```sh
 # Runs checks, bumps Cargo.toml and Cargo.lock, prepends the git-cliff changelog section, commits, and creates a v* tag.

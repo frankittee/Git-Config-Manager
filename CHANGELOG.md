@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.0.0..v1.1.0) - 2026-11-11
+
+#### Features
+- Add inline form for interactive add and edit - ([3eabd7a](https://github.com/frankittee/Git-Config-Manager/commit/3eabd7a19ec7b786f28f247a68f0e86ff4dd9876)) - frankittee
+
+#### Bug Fixes
+- Clarify g use success message - ([2e7b48d](https://github.com/frankittee/Git-Config-Manager/commit/2e7b48d887d69729527f6bcde1613e0c456b9433)) - frankittee
+
+#### Documentation
+- Add VHS demo recording - ([7636110](https://github.com/frankittee/Git-Config-Manager/commit/7636110df0b0e0c07d1706e0cb9cc14cfb27346c)) - frankittee
+
 ## [v1.0.0](https://github.com/frankittee/Git-Config-Manager/compare/v0.6.0..v1.0.0) - 2026-11-11
 
 #### Features

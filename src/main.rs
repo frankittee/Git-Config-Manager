@@ -132,7 +132,7 @@ fn run() -> Result<()> {
         Some(cli::Command::Use { profile }) => {
             let value = store.get(&profile)?;
             let config_file = git::apply_profile(&value)?;
-            println!("Successfully write profiles into {config_file}");
+            println!("Applied '{profile}' to {config_file}");
         }
         Some(cli::Command::Unuse) => match git::remove_identity()? {
             Some(config_file) => println!("Successfully removed identity from {config_file}"),

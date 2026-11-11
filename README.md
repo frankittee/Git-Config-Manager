@@ -18,7 +18,7 @@ A fast, focused CLI for managing Git profiles per repository.
 
 ```text
 $ g use work
-Successfully write profiles into .git/config
+Applied 'work' to .git/config
 ```
 
 ## Why g?

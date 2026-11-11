@@ -270,10 +270,7 @@ fn applies_profiles_and_reports_current() {
 
     let use_output = context.g(&["use", "work"]);
     assert_success(&use_output);
-    assert_eq!(
-        stdout(&use_output),
-        "Successfully write profiles into .git/config\n"
-    );
+    assert_eq!(stdout(&use_output), "Applied 'work' to .git/config\n");
     assert_eq!(context.git_value("user.name").as_deref(), Some("Work User"));
     assert_eq!(
         context.git_value("user.email").as_deref(),
@@ -292,7 +289,7 @@ fn use_from_home_applies_profile_globally() {
     assert_eq!(
         stdout(&use_output),
         format!(
-            "Successfully write profiles into {}\n",
+            "Applied 'work' to {}\n",
             context.config.path().join("gitconfig").display()
         )
     );

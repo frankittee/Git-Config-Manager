@@ -9,6 +9,8 @@ This repository contains the Rust CLI binary `g`.
 - `src/profiles.rs` validates and atomically persists profiles.
 - `src/git.rs` reads and updates repository-local Git configuration.
 - `src/input.rs` implements interactive prompts.
+- `skills/g/SKILL.md` is the agent skill that documents safe `g` usage; keep it in sync with the CLI.
+- `.github/workflows/ci.yml` runs formatting, Clippy, and tests on Linux and macOS.
 - `tests/cli.rs` contains end-to-end CLI tests using isolated temporary directories and Git repositories.
 - `.github/workflows/release.yml` builds tagged releases for Linux musl and macOS targets.
 

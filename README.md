@@ -7,7 +7,8 @@
 A fast, focused CLI for managing Git profiles per repository.
 
 [![Release](https://img.shields.io/github/v/release/frankittee/Git-Config-Manager?style=flat-square)](https://github.com/frankittee/Git-Config-Manager/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/frankittee/Git-Config-Manager/release.yml?style=flat-square&label=release)](https://github.com/frankittee/Git-Config-Manager/actions/workflows/release.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/frankittee/Git-Config-Manager/ci.yml?style=flat-square&label=ci)](https://github.com/frankittee/Git-Config-Manager/actions/workflows/ci.yml)
+[![Release build](https://img.shields.io/github/actions/workflow/status/frankittee/Git-Config-Manager/release.yml?style=flat-square&label=release)](https://github.com/frankittee/Git-Config-Manager/actions/workflows/release.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-dea584?style=flat-square)](https://www.rust-lang.org/)
 
@@ -107,8 +108,13 @@ When adding or editing a profile, use `Tab` to move between fields, `Space` to t
 | `g list` | List saved profiles |
 | `g show <profile>` | Show profile details |
 | `g use <profile>` | Apply a profile |
+| `g unuse` | Remove the identity applied by `g` |
 | `g info` | Show the matching active profile |
 | `g remove <profile>` | Remove a profile |
+| `g export <profile>` | Print a profile as TOML |
+| `g import <profile> [file]` | Import a profile from TOML (file or stdin) |
+| `g completion <shell>` | Print a shell completion script |
+| `g -C <path> <command>` | Run a command as if started in `<path>` |
 
 All profile fields can also be provided as flags, which makes `g` convenient in scripts:
 
@@ -129,6 +135,50 @@ g edit work --no-ssh-host
 ```
 
 Run `g <command> --help` for every available option. The terminal UI and prompts require a TTY; in CI, provide both `--name` and `--email` when adding a profile.
+
+## Running from another directory
+
+Like `git -C`, the global `-C <path>` option runs a command as if `g` had been started in `<path>`. Put it before the subcommand:
+
+```sh
+g -C ../my-project use work
+g -C ../my-project info
+```
+
+## Removing an identity
+
+`g unuse` removes the identity that `g use` applies from the current scope: `user.name`, `user.email`, `user.signingkey`, `commit.gpgsign`, and `gpg.format`. It uses the same scope rules as `g use` (the repository's local configuration, or the global configuration from your home directory), restores the previous configuration if a write fails, and succeeds with a message when nothing is set. SSH remote URLs rewritten by `ssh_host` are left untouched.
+
+## Sharing profiles
+
+`g export` prints a profile as TOML, and `g import` reads it from a file or from standard input (omit the file or pass `-`). Import validates the profile and refuses to overwrite an existing one unless you pass `--force`.
+
+```sh
+g export work > work.toml
+g import work-copy work.toml
+g export work | g import work2
+```
+
+Exported files contain your email address and signing key, so keep them private.
+
+## Shell completion
+
+```sh
+# fish
+g completion fish > ~/.config/fish/completions/g.fish
+
+# bash
+g completion bash > ~/.local/share/bash-completion/completions/g
+
+# zsh (write to a directory on your $fpath)
+g completion zsh > ~/.zfunc/_g
+```
+
+Bash, Zsh, Fish, Elvish, Nushell, and PowerShell are supported.
+
+## AI agents
+
+[`skills/g/SKILL.md`](skills/g/SKILL.md) is an agent skill that teaches coding agents to manage identities with `g` safely. Copy or symlink the `skills/g` directory into your agent's skills directory, for example `~/.claude/skills/g`.
 
 ## How it works
 

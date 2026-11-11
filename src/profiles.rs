@@ -23,6 +23,16 @@ pub struct Profile {
     pub ssh_host: Option<String>,
 }
 
+impl Profile {
+    pub fn to_toml(&self) -> Result<String> {
+        toml::to_string_pretty(self).context("could not serialize profile")
+    }
+
+    pub fn from_toml(contents: &str) -> Result<Self> {
+        toml::from_str(contents).context("invalid profile TOML; expected name and email fields")
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Profiles {
     #[serde(default)]
@@ -90,7 +100,7 @@ impl ProfileStore {
         let stored = profiles
             .profiles
             .get_mut(name)
-            .with_context(|| format!("profile '{name}' does not exist"))?;
+            .with_context(|| missing(name))?;
         *stored = profile;
         self.save(&profiles)
     }
@@ -103,13 +113,25 @@ impl ProfileStore {
         self.load()?
             .profiles
             .remove(name)
-            .with_context(|| format!("profile '{name}' does not exist"))
+            .with_context(|| missing(name))
+    }
+
+    /// Insert or replace a profile; used by `g import --force`.
+    pub fn import(&self, name: String, profile: Profile, force: bool) -> Result<()> {
+        if !force {
+            return self.add(name, profile);
+        }
+        validate_name(&name)?;
+        validate_profile(&profile)?;
+        let mut profiles = self.load()?;
+        profiles.profiles.insert(name, profile);
+        self.save(&profiles)
     }
 
     pub fn remove(&self, name: &str) -> Result<()> {
         let mut profiles = self.load()?;
         if profiles.profiles.remove(name).is_none() {
-            bail!("profile '{name}' does not exist");
+            bail!(missing(name));
         }
         self.save(&profiles)
     }
@@ -159,6 +181,10 @@ fn default_path(home: &Path) -> PathBuf {
     home.join(".config")
         .join("git-config-switch")
         .join("config.toml")
+}
+
+fn missing(name: &str) -> String {
+    format!("profile '{name}' does not exist; run 'g list' to see saved profiles")
 }
 
 fn ensure_available(profiles: &Profiles, name: &str) -> Result<()> {
@@ -331,5 +357,35 @@ mod tests {
                 .unwrap()
                 .contains("work@example.com")
         );
+    }
+
+    #[test]
+    fn toml_round_trip_preserves_optional_fields() {
+        let mut value = profile("Work", "work@example.com");
+        value.signing_key = Some("KEY".into());
+        value.ssh_host = Some("github-work".into());
+        assert_eq!(
+            Profile::from_toml(&value.to_toml().unwrap()).unwrap(),
+            value
+        );
+    }
+
+    #[test]
+    fn import_force_replaces_existing_profile() {
+        let directory = tempdir().unwrap();
+        let store = ProfileStore::new(directory.path().join("config.toml"));
+        store
+            .add("work".into(), profile("Old", "old@example.com"))
+            .unwrap();
+        let replacement = profile("New", "new@example.com");
+        assert!(
+            store
+                .import("work".into(), replacement.clone(), false)
+                .is_err()
+        );
+        store
+            .import("work".into(), replacement.clone(), true)
+            .unwrap();
+        assert_eq!(store.get("work").unwrap(), replacement);
     }
 }

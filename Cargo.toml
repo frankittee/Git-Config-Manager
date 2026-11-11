@@ -11,7 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
-usage = { package = "usage-rs", version = "6" }
+usage = { package = "usage-rs", version = "6", features = ["completions"] }
 crossterm = "0.28"
 directories = "6.0"
 ratatui = "0.29"

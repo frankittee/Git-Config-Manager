@@ -1,7 +1,8 @@
 use std::{
     fs,
+    io::Write,
     path::Path,
-    process::{Command, Output},
+    process::{Command, Output, Stdio},
 };
 
 use tempfile::TempDir;
@@ -40,6 +41,38 @@ impl TestContext {
             .current_dir(self.repository.path())
             .output()
             .unwrap()
+    }
+
+    fn g_in(&self, directory: &Path, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_g"))
+            .args(args)
+            .env("HOME", self.home.path())
+            .env("G_CONFIG_DIR", self.config.path())
+            .env("GIT_CONFIG_GLOBAL", self.config.path().join("gitconfig"))
+            .current_dir(directory)
+            .output()
+            .unwrap()
+    }
+
+    fn g_with_stdin(&self, args: &[&str], input: &str) -> Output {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_g"))
+            .args(args)
+            .env("HOME", self.home.path())
+            .env("G_CONFIG_DIR", self.config.path())
+            .env("GIT_CONFIG_GLOBAL", self.config.path().join("gitconfig"))
+            .current_dir(self.repository.path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        child.wait_with_output().unwrap()
     }
 
     fn g_from_home(&self, args: &[&str]) -> Output {
@@ -479,4 +512,170 @@ fn profile_file_uses_expected_location() {
             .join("config.toml")
             .exists()
     );
+}
+
+#[test]
+fn directory_option_applies_profile_from_outside_repository() {
+    let context = TestContext::new(true);
+    add(&context, "work", "Work User", "work@example.com");
+    let outside = tempfile::tempdir().unwrap();
+    let repository = context.repository.path().to_str().unwrap();
+
+    assert_success(&context.g_in(outside.path(), &["-C", repository, "use", "work"]));
+    assert_eq!(context.git_value("user.name").as_deref(), Some("Work User"));
+
+    let info = context.g_in(outside.path(), &["-C", repository, "info"]);
+    assert_eq!(stdout(&info), "work\n");
+
+    let missing = context.g_in(outside.path(), &["-C", "/nonexistent/g-test", "info"]);
+    assert!(!missing.status.success());
+    assert!(stderr(&missing).contains("could not change directory"));
+}
+
+#[test]
+fn unuse_removes_identity_and_signing_keys() {
+    let context = TestContext::new(true);
+    assert_success(&context.g(&[
+        "add",
+        "work",
+        "--name",
+        "Work User",
+        "--email",
+        "work@example.com",
+        "--signing-key",
+        "KEY",
+    ]));
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(context.git_value("commit.gpgsign").as_deref(), Some("true"));
+
+    let output = context.g(&["unuse"]);
+    assert_success(&output);
+    assert!(stdout(&output).contains("Successfully removed identity from"));
+    for key in [
+        "user.name",
+        "user.email",
+        "user.signingkey",
+        "commit.gpgsign",
+        "gpg.format",
+    ] {
+        assert_eq!(context.git_value(key), None, "{key}");
+    }
+    assert_eq!(stdout(&context.g(&["info"])), "unmanaged\n");
+}
+
+#[test]
+fn unuse_with_nothing_set_succeeds() {
+    let context = TestContext::new(true);
+    let output = context.g(&["unuse"]);
+    assert_success(&output);
+    assert!(stdout(&output).contains("Nothing to remove"));
+}
+
+#[test]
+fn unuse_requires_repository_for_local_scope() {
+    let context = TestContext::new(false);
+    let output = context.g(&["unuse"]);
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("not inside a Git repository"));
+}
+
+#[test]
+fn unuse_from_home_removes_global_identity() {
+    let context = TestContext::new(false);
+    add(&context, "work", "Work User", "work@example.com");
+    assert_success(&context.g_from_home(&["use", "work"]));
+    assert!(context.global_git_value("user.name").is_some());
+
+    assert_success(&context.g_from_home(&["unuse"]));
+    assert_eq!(context.global_git_value("user.name"), None);
+}
+
+#[test]
+fn export_and_import_round_trip() {
+    let context = TestContext::new(false);
+    assert_success(&context.g(&[
+        "add",
+        "work",
+        "--name",
+        "Work User",
+        "--email",
+        "work@example.com",
+        "--signing-key",
+        "KEY",
+    ]));
+    let exported = context.g(&["export", "work"]);
+    assert_success(&exported);
+
+    let imported = context.g_with_stdin(&["import", "work2"], &stdout(&exported));
+    assert_success(&imported);
+    assert_eq!(
+        stdout(&context.g(&["show", "work2"])),
+        stdout(&context.g(&["show", "work"]))
+    );
+
+    let file = context.config.path().join("profile.toml");
+    fs::write(&file, stdout(&exported)).unwrap();
+    assert_success(&context.g(&["import", "work3", file.to_str().unwrap()]));
+    assert_eq!(
+        stdout(&context.g(&["show", "work3"])),
+        stdout(&context.g(&["show", "work"]))
+    );
+}
+
+#[test]
+fn import_refuses_duplicate_without_force() {
+    let context = TestContext::new(false);
+    add(&context, "work", "Work User", "work@example.com");
+    let replacement = "name = \"New User\"\nemail = \"new@example.com\"\n";
+
+    let refused = context.g_with_stdin(&["import", "work", "-"], replacement);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("already exists"));
+    assert!(stdout(&context.g(&["show", "work"])).contains("name=Work User"));
+
+    assert_success(&context.g_with_stdin(&["import", "work", "--force"], replacement));
+    assert!(stdout(&context.g(&["show", "work"])).contains("name=New User"));
+}
+
+#[test]
+fn import_validates_profile() {
+    let context = TestContext::new(false);
+    let invalid = context.g_with_stdin(&["import", "bad"], "name = \" \"\nemail = \"a@b.c\"\n");
+    assert!(!invalid.status.success());
+    assert!(stderr(&invalid).contains("name must not be empty"));
+
+    let malformed = context.g_with_stdin(&["import", "bad"], "not toml");
+    assert!(!malformed.status.success());
+    assert!(stderr(&malformed).contains("invalid profile TOML"));
+    assert_eq!(stdout(&context.g(&["list"])), "");
+}
+
+#[test]
+fn list_without_profiles_prints_hint_to_stderr() {
+    let context = TestContext::new(false);
+    let output = context.g(&["list"]);
+    assert_success(&output);
+    assert_eq!(stdout(&output), "");
+    assert!(stderr(&output).contains("g add <profile>"));
+}
+
+#[test]
+fn missing_profile_suggests_list() {
+    let context = TestContext::new(true);
+    for command in ["use", "show", "remove", "export"] {
+        let output = context.g(&[command, "ghost"]);
+        assert_eq!(output.status.code(), Some(1), "{command}");
+        assert!(stderr(&output).contains("g list"), "{command}");
+    }
+}
+
+#[test]
+fn completion_prints_script_for_each_shell() {
+    let context = TestContext::new(false);
+    for shell in ["bash", "zsh", "fish"] {
+        let output = context.g(&["completion", shell]);
+        assert_success(&output);
+        assert!(stdout(&output).contains("g"), "{shell}");
+    }
+    assert!(!context.g(&["completion", "tcsh"]).status.success());
 }

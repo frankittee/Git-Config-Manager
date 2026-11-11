@@ -127,6 +127,33 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
     config_origin(scope, "user.name")
 }
 
+/// Remove the identity keys that `apply_profile` manages. Remote URLs are left untouched.
+/// Returns the config file that was changed, or `None` when nothing was set.
+pub fn remove_identity() -> Result<Option<String>> {
+    let scope = config_scope()?;
+    if matches!(scope, ConfigScope::Local) {
+        ensure_repository()?;
+    }
+    let keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    let original = snapshot(scope, &keys)?;
+    let Some(origin_key) = original
+        .iter()
+        .find(|(_, values)| !values.is_empty())
+        .map(|(key, _)| key.clone())
+    else {
+        return Ok(None);
+    };
+    let config_file = config_origin(scope, &origin_key)?;
+    let result = keys.iter().try_for_each(|key| unset(scope, key));
+    if let Err(error) = result {
+        if let Err(rollback_error) = restore(scope, &original) {
+            return Err(error.context(format!("rollback also failed: {rollback_error:#}")));
+        }
+        return Err(error.context("Git configuration was restored"));
+    }
+    Ok(Some(config_file))
+}
+
 fn config_scope() -> Result<ConfigScope> {
     let current_dir = canonical_current_dir()?;
     let home_dir = BaseDirs::new()

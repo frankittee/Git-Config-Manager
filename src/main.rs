@@ -4,9 +4,13 @@ mod input;
 mod profiles;
 mod tui;
 
-use std::io::{self, IsTerminal};
+use std::{
+    fs,
+    io::{self, IsTerminal, Read},
+    path::Path,
+};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 fn main() {
     if let Err(error) = run() {
@@ -17,6 +21,10 @@ fn main() {
 
 fn run() -> Result<()> {
     let cli = cli::Cli::parse();
+    if let Some(directory) = &cli.directory {
+        std::env::set_current_dir(directory)
+            .with_context(|| format!("could not change directory to {}", directory.display()))?;
+    }
     let store = profiles::ProfileStore::from_environment()?;
 
     match cli.command {
@@ -98,7 +106,11 @@ fn run() -> Result<()> {
             println!("{profile}");
         }
         Some(cli::Command::List) => {
-            for name in store.list()? {
+            let names = store.list()?;
+            if names.is_empty() {
+                eprintln!("no profiles yet; create one with 'g add <profile>'");
+            }
+            for name in names {
                 println!("{name}");
             }
         }
@@ -122,6 +134,26 @@ fn run() -> Result<()> {
             let config_file = git::apply_profile(&value)?;
             println!("Successfully write profiles into {config_file}");
         }
+        Some(cli::Command::Unuse) => match git::remove_identity()? {
+            Some(config_file) => println!("Successfully removed identity from {config_file}"),
+            None => println!("Nothing to remove; no identity is set"),
+        },
+        Some(cli::Command::Export { profile }) => {
+            print!("{}", store.get(&profile)?.to_toml()?);
+        }
+        Some(cli::Command::Import {
+            profile,
+            file,
+            force,
+        }) => {
+            let contents = read_import(file.as_deref())?;
+            let value = profiles::Profile::from_toml(&contents)?;
+            store.import(profile.clone(), value, force)?;
+            println!("{profile}");
+        }
+        Some(cli::Command::Completion { shell }) => {
+            print!("{}", cli::Cli::completion_script(shell.into()));
+        }
         Some(cli::Command::Info) => {
             git::ensure_repository()?;
             let current = git::read_identity()?;
@@ -136,4 +168,19 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn read_import(file: Option<&Path>) -> Result<String> {
+    match file {
+        Some(path) if path != Path::new("-") => {
+            fs::read_to_string(path).with_context(|| format!("could not read {}", path.display()))
+        }
+        _ => {
+            let mut contents = String::new();
+            io::stdin()
+                .read_to_string(&mut contents)
+                .context("could not read standard input")?;
+            Ok(contents)
+        }
+    }
 }

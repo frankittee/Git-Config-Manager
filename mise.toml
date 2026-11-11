@@ -1,5 +1,21 @@
 [tools]
-cocogitto = "latest"
 "cargo:cargo-edit" = "latest"
-prek = "latest"
+git-cliff = "latest"
+hk = "latest"
+pkl = "latest"
 rust = "latest"
+
+[env]
+HK_MISE = "1"
+
+[tasks.check]
+description = "Run formatting and Clippy checks through hk"
+run = "hk check --all"
+
+[tasks.fix]
+description = "Apply formatting and Clippy fixes through hk"
+run = "hk fix --all"
+
+[tasks.release]
+description = "Bump the version, update CHANGELOG.md, commit, and tag"
+run = "bash scripts/release.sh"

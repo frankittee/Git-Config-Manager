@@ -4,9 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-- - -
 ## [v0.6.0](https://github.com/frankittee/Git-Config-Manager/compare/81965f560517eec28d5f5468a3bdd9412db587ac..v0.6.0) - 2026-09-03
 #### Features
 - migrate CLI to usage-rs - ([f534c91](https://github.com/frankittee/Git-Config-Manager/commit/f534c916443c53fb6e2da4e7c04f6695c35bafd4)) - frankittee

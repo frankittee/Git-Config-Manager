@@ -1,0 +1,42 @@
+# git-cliff configuration: https://git-cliff.org/docs/configuration
+# `mise run release` renders only the new version section and inserts it into CHANGELOG.md.
+
+[remote.github]
+owner = "frankittee"
+repo = "Git-Config-Manager"
+
+[changelog]
+body = """
+{% set repo = "https://github.com/frankittee/Git-Config-Manager" -%}
+## [{{ version }}]({{ repo }}/compare/{{ previous.version }}..{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+#### {{ group | striptags | trim }}
+{% for commit in commits -%}
+- {% if commit.scope %}**({{ commit.scope }})** {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }} - ([{{ commit.id | truncate(length=7, end="") }}]({{ repo }}/commit/{{ commit.id }})) - {{ commit.author.name }}
+{% endfor -%}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+commit_parsers = [
+  { message = "^chore\\(version\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance Improvements" },
+  { message = "^refactor", group = "<!-- 3 -->Refactoring" },
+  { message = "^doc", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^build", group = "<!-- 6 -->Build System" },
+  { message = "^ci", group = "<!-- 7 -->Continuous Integration" },
+  { message = "^revert", group = "<!-- 8 -->Reverts" },
+  { message = "^style", group = "<!-- 9 -->Style" },
+  { message = "^chore", group = "<!-- 10 -->Miscellaneous Chores" },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true

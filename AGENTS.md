@@ -13,6 +13,7 @@ This repository contains the Rust CLI binary `g`.
 - `.github/workflows/ci.yml` runs formatting, Clippy, and tests on Linux and macOS.
 - `tests/cli.rs` contains end-to-end CLI tests using isolated temporary directories and Git repositories.
 - `.github/workflows/release.yml` builds tagged releases for Linux musl and macOS targets.
+- `hk.pkl` configures Git hooks; `cliff.toml` configures git-cliff changelog generation; `scripts/release.sh` (run via `mise run release`) creates release commits and tags.
 
 Profiles default to `$HOME/.config/git-config-switch/config.toml`. Tests must set `G_CONFIG_DIR` and must not modify a developer's real configuration.
 
@@ -31,13 +32,14 @@ mise x -- cargo build --release --locked      # Build an optimized, locked relea
 
 Run formatting with `mise x -- cargo fmt` before committing. Never edit `Cargo.lock` manually except for an intentional package-version change.
 
-Install the Conventional Commit message hook once after cloning:
+Git hooks are managed by [hk](https://hk.jdx.dev/) and configured in `hk.pkl`. Install them once after cloning:
 
 ```sh
-mise x -- prek install --hook-type commit-msg
+mise install
+mise x -- hk install --mise
 ```
 
-The hook rejects non-conforming messages. Version bumps follow Conventional Commits: `fix` creates a patch release, `feat` a minor release, and a breaking change a major release.
+The `commit-msg` hook rejects messages that are not Conventional Commits, `pre-commit` runs `cargo fmt` on staged Rust files, and `pre-push` runs `cargo fmt --check` plus Clippy. Run the same checks manually with `mise run check`, or apply fixes with `mise run fix`. Version bumps follow Conventional Commits: `fix` creates a patch release, `feat` a minor release, and a breaking change a major release.
 
 ## Coding Style & Naming Conventions
 
@@ -61,4 +63,4 @@ Run GitHub CLI commands through mise, for example `mise x -- gh auth status`, ra
 
 ## Release Safety
 
-Releases are triggered only by `v*` tags. Run `mise x -- cog bump --auto` to calculate the next version, update `Cargo.toml`, `Cargo.lock`, and `CHANGELOG.md`, create the release commit, and tag it. Then run `git push --follow-tags`. Ensure the tag exactly matches the package version before pushing.
+Releases are triggered only by `v*` tags. Run `mise run release` to calculate the next version with git-cliff, run fmt/Clippy/tests, update `Cargo.toml`, `Cargo.lock`, and `CHANGELOG.md`, create the `chore(version): vX.Y.Z` release commit, and tag it. Pass an explicit version with `mise run release 1.2.3` when needed. The script only prepends the new section to `CHANGELOG.md`, so never rewrite older entries. Then run `git push --follow-tags`. Ensure the tag exactly matches the package version before pushing.

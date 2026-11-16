@@ -89,6 +89,8 @@ Check which saved profile matches the repository:
 
 ```sh
 g info
+g info --short   # profile name only; empty when unmanaged (for shell prompts)
+g doctor
 ```
 
 ## Terminal UI
@@ -122,6 +124,8 @@ When adding or editing a profile, use `Tab` to move between fields, `Space` to t
 | `g use <profile>` | Apply a profile |
 | `g unuse` | Remove the identity applied by `g` |
 | `g info` | Show the matching active profile |
+| `g info --short` | Print only the profile name, or nothing when unmanaged or outside a repository |
+| `g doctor` | Check saved profiles for missing signing key files, undeclared SSH host aliases, and a missing `gpg.ssh.allowedSignersFile`; exits 1 on errors |
 | `g remove <profile>` | Remove a profile |
 | `g export <profile>` | Print a profile as TOML |
 | `g import <profile> [file]` | Import a profile from TOML (file or stdin) |

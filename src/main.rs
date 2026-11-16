@@ -1,4 +1,5 @@
 mod cli;
+mod doctor;
 mod git;
 mod input;
 mod profiles;
@@ -180,7 +181,22 @@ fn run() -> Result<()> {
         Some(cli::Command::Completion { shell }) => {
             print!("{}", cli::Cli::completion_script(shell.into()));
         }
-        Some(cli::Command::Info) => {
+        Some(cli::Command::Info { short: true }) => {
+            // Shell prompts call this on every redraw, so it must never fail loudly.
+            if git::ensure_repository().is_ok()
+                && let Ok(current) = git::read_identity()
+                && let Ok(profiles) = store.load()
+                && let Some(name) = profiles.matching_name(&current)
+            {
+                println!("{name}");
+            }
+        }
+        Some(cli::Command::Doctor) => {
+            if !run_doctor(&store)? {
+                std::process::exit(1);
+            }
+        }
+        Some(cli::Command::Info { short: false }) => {
             git::ensure_repository()?;
             let current = git::read_identity()?;
             let profiles = store.load()?;
@@ -194,6 +210,41 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Prints one line per issue and returns whether every profile is free of errors.
+fn run_doctor(store: &profiles::ProfileStore) -> Result<bool> {
+    let profiles = store.load()?;
+    if profiles.profiles.is_empty() {
+        println!("no profiles yet; create one with 'g add <profile>'");
+        return Ok(true);
+    }
+    let home = git::home_dir()?;
+    let aliases = ssh_aliases();
+    let allowed_signers = git::allowed_signers_file()?;
+    let environment = doctor::Environment {
+        home: &home,
+        ssh_aliases: &aliases,
+        allowed_signers_file: allowed_signers.as_deref(),
+    };
+    let mut healthy = true;
+    for (name, profile) in &profiles.profiles {
+        let issues = doctor::check_profile(profile, &environment);
+        if issues.is_empty() {
+            println!("{name}: ok");
+        }
+        for issue in issues {
+            let label = match issue.severity {
+                doctor::Severity::Error => {
+                    healthy = false;
+                    "error"
+                }
+                doctor::Severity::Warning => "warning",
+            };
+            println!("{name}: {label}: {}", issue.message);
+        }
+    }
+    Ok(healthy)
 }
 
 fn ssh_aliases() -> Vec<String> {

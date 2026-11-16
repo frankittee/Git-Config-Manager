@@ -695,3 +695,63 @@ fn completion_prints_script_for_each_shell() {
     }
     assert!(!context.g(&["completion", "tcsh"]).status.success());
 }
+
+#[test]
+fn info_short_prints_only_the_matching_profile() {
+    let context = TestContext::new(true);
+    add(&context, "work", "Work User", "work@example.com");
+
+    let unmanaged = context.g(&["info", "--short"]);
+    assert_success(&unmanaged);
+    assert_eq!(stdout(&unmanaged), "");
+
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(stdout(&context.g(&["info", "--short"])), "work\n");
+}
+
+#[test]
+fn info_short_is_silent_outside_a_repository() {
+    let context = TestContext::new(false);
+    let output = context.g(&["info", "--short"]);
+    assert_success(&output);
+    assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), "");
+}
+
+#[test]
+fn doctor_reports_problems_and_fails() {
+    let context = TestContext::new(false);
+    add(&context, "plain", "Plain User", "plain@example.com");
+    assert_success(&context.g(&[
+        "add",
+        "broken",
+        "--name",
+        "Broken User",
+        "--email",
+        "broken@example.com",
+        "--signing-key",
+        "~/.ssh/missing.pub",
+    ]));
+
+    let output = context.g(&["doctor"]);
+    assert!(!output.status.success());
+    let report = stdout(&output);
+    assert!(report.contains("plain: ok\n"), "{report}");
+    assert!(
+        report.contains("broken: error: signing key file"),
+        "{report}"
+    );
+    assert!(
+        report.contains("broken: warning: gpg.ssh.allowedSignersFile is not set"),
+        "{report}"
+    );
+}
+
+#[test]
+fn doctor_passes_for_healthy_profiles() {
+    let context = TestContext::new(false);
+    add(&context, "plain", "Plain User", "plain@example.com");
+    let output = context.g(&["doctor"]);
+    assert_success(&output);
+    assert_eq!(stdout(&output), "plain: ok\n");
+}

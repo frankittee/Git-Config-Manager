@@ -7,7 +7,7 @@ use usage::{Cli as CliParser, Subcommands, ValueEnum};
     bin = "g",
     version,
     about = "Switch Git identity profiles in the current repository",
-    after_help = "Examples:\n  g add work\n  g edit work\n  g edit work --email new@example.com\n  g add personal --name \"Ada Lovelace\" --email ada@example.com\n  g use work\n  g -C ../repo use work\n  g unuse\n  g info",
+    after_help = "Examples:\n  g add work\n  g edit work\n  g edit work --email new@example.com\n  g add personal --name \"Ada Lovelace\" --email ada@example.com\n  g use work\n  g -C ../repo use work\n  g unuse\n  g info\n  g doctor",
     unknown_flags = "error",
     args_override_self = false,
     completion
@@ -103,7 +103,13 @@ pub enum Command {
         shell: Shell,
     },
     /// Show the profile matching the current repository configuration
-    Info,
+    Info {
+        /// Print only the profile name, or nothing when unmanaged or outside a repository
+        #[usage(long)]
+        short: bool,
+    },
+    /// Check saved profiles for missing key files, SSH aliases, and signer files
+    Doctor,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

@@ -361,6 +361,24 @@ fn read_identity_at(scope: ConfigScope) -> Result<GitIdentity> {
     })
 }
 
+/// Effective `gpg.ssh.allowedSignersFile` across all scopes, if any.
+pub fn allowed_signers_file() -> Result<Option<String>> {
+    let output = run_git(&["config", "--get", "gpg.ssh.allowedSignersFile"])?;
+    if output.status.success() {
+        let value = String::from_utf8(output.stdout).context("Git returned non-UTF-8 output")?;
+        Ok(Some(value.trim().to_owned()).filter(|value| !value.is_empty()))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn home_dir() -> Result<PathBuf> {
+    Ok(BaseDirs::new()
+        .context("could not determine the user home directory")?
+        .home_dir()
+        .to_path_buf())
+}
+
 fn config_origin(scope: ConfigScope, key: &str) -> Result<String> {
     let output = run_git(&["config", scope.argument(), "--show-origin", "--get", key])?;
     if !output.status.success() {

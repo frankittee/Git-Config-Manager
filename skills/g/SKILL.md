@@ -47,6 +47,8 @@ g remove work
 ```sh
 g use work
 g info
+g info --short
+g doctor
 g -C /path/to/repo use work
 g -C /path/to/repo info
 g unuse
@@ -54,7 +56,8 @@ g unuse
 
 - `g use` sets `user.name` and `user.email`. With a signing key it also sets `user.signingkey`, `commit.gpgsign=true`, and `gpg.format` (`openpgp` for hex key IDs, `ssh` otherwise); without one it removes those three keys.
 - With an `ssh_host`, `g use` rewrites SSH fetch and push URLs of every remote in a repository to go through that alias. HTTPS and local URLs are left alone. Global scope never rewrites remotes.
-- `g info` prints the matching profile name, or `unmanaged` plus the current values.
+- `g info` prints the matching profile name, or `unmanaged` plus the current values. `g info --short` prints only the name and never fails, which suits shell prompts.
+- `g doctor` checks every saved profile for a missing SSH signing key file, an undeclared `ssh_host` alias, and an unset `gpg.ssh.allowedSignersFile` (warning only). It exits 1 when any error is found.
 - `g unuse` unsets the five identity keys in the current scope and prints which file changed, or says nothing needed removing. It does not undo remote URL rewrites; use `g use <other-profile>` to rewrite them to another alias.
 - Writes are rolled back automatically if any step fails.
 

@@ -1,10 +1,17 @@
 amends "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtins.pkl"
 
+local cargo_fmt = (Builtins.cargo_fmt) {
+  check = "mbx fmt --check --manifest-path {{workspace_indicator}}"
+  check_list_files = "mbx fmt --check --manifest-path {{workspace_indicator}} -- --files-with-diff"
+  fix = "mbx fmt --manifest-path {{workspace_indicator}}"
+}
+
 local linters = new Mapping<String, Step> {
-  ["cargo-fmt"] = Builtins.cargo_fmt
+  ["cargo-fmt"] = cargo_fmt
   ["cargo-clippy"] = (Builtins.cargo_clippy) {
-    check = "cargo clippy --manifest-path {{workspace_indicator}} --quiet --all-targets -- -D warnings"
+    check = "mbx clippy --manifest-path {{workspace_indicator}} --quiet --all-targets -- -D warnings"
+    fix = "mbx clippy --manifest-path {{workspace_indicator}} --fix --allow-dirty --allow-staged --quiet"
   }
 }
 
@@ -18,7 +25,7 @@ hooks {
     fix = true
     stash = "git"
     steps {
-      ["cargo-fmt"] = Builtins.cargo_fmt
+      ["cargo-fmt"] = cargo_fmt
     }
   }
   ["pre-push"] {

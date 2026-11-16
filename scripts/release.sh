@@ -10,7 +10,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     exit 1
 fi
 
-current="$(cargo pkgid | sed 's/.*[#@]//')"
+current="$(mbx pkgid | sed 's/.*[#@]//')"
 version="${1:-$(git cliff --bumped-version 2>/dev/null)}"
 version="${version#v}"
 if [ -z "$version" ] || [ "$version" = "$current" ]; then
@@ -25,18 +25,18 @@ fi
 
 echo "Releasing $tag (current v$current)"
 
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-# Update the [package] version in Cargo.toml; cargo check then syncs Cargo.lock.
+mbx fmt --check
+mbx clippy --all-targets -- -D warnings
+mbx test
+# Update the [package] version in Cargo.toml; mbx check then syncs Cargo.lock.
 VERSION="$version" awk '
     /^\[/ { in_package = ($0 == "[package]") }
     in_package && !done && /^version[[:space:]]*=/ { print "version = \"" ENVIRON["VERSION"] "\""; done = 1; next }
     { print }
 ' Cargo.toml >Cargo.toml.tmp
 mv Cargo.toml.tmp Cargo.toml
-cargo check --release
-if [ "$(cargo pkgid | sed 's/.*[#@]//')" != "$version" ]; then
+mbx check --release
+if [ "$(mbx pkgid | sed 's/.*[#@]//')" != "$version" ]; then
     echo "error: failed to set Cargo.toml version to $version" >&2
     exit 1
 fi

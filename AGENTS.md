@@ -23,15 +23,15 @@ Profiles default to `$HOME/.config/git-config-switch/config.toml`. Tests must se
 Use the stable Rust toolchain through mise. Wrap all Rust-related commands with `mise x --`:
 
 ```sh
-mise x -- cargo build                         # Compile a debug binary
-mise x -- cargo run -- add work               # Run the CLI locally
-mise x -- cargo test                          # Run unit and integration tests
-mise x -- cargo fmt --check                   # Verify rustfmt formatting
-mise x -- cargo clippy --all-targets -- -D warnings
-mise x -- cargo build --release --locked      # Build an optimized, locked release
+mise x -- mbx build                           # Compile a debug binary
+mise x -- mbx run -- add work                 # Run the CLI locally
+mise x -- mbx test                            # Run unit and integration tests
+mise x -- mbx fmt --check                     # Verify rustfmt formatting
+mise x -- mbx clippy --all-targets -- -D warnings
+mise x -- mbx build --release --locked        # Build an optimized, locked release
 ```
 
-Run formatting with `mise x -- cargo fmt` before committing. Never edit `Cargo.lock` manually except for an intentional package-version change.
+Run formatting with `mise x -- mbx fmt` before committing. Never edit `Cargo.lock` manually except for an intentional package-version change.
 
 Git hooks are managed by [hk](https://hk.jdx.dev/) and configured in `hk.pkl`. Install them once after cloning:
 
@@ -40,7 +40,7 @@ mise install
 mise x -- hk install --mise
 ```
 
-The `commit-msg` hook rejects messages that are not Conventional Commits, `pre-commit` runs `cargo fmt` on staged Rust files, and `pre-push` runs `cargo fmt --check` plus Clippy. Run the same checks manually with `mise run check`, or apply fixes with `mise run fix`. Version bumps follow Conventional Commits: `fix` creates a patch release, `feat` a minor release, and a breaking change a major release.
+The `commit-msg` hook rejects messages that are not Conventional Commits, `pre-commit` runs `mbx fmt` on staged Rust files, and `pre-push` runs `mbx fmt --check` plus Clippy. Run the same checks manually with `mise run check`, or apply fixes with `mise run fix`. Version bumps follow Conventional Commits: `fix` creates a patch release, `feat` a minor release, and a breaking change a major release.
 
 ## Coding Style & Naming Conventions
 

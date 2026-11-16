@@ -53,11 +53,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes musl-tools
 
+      - name: Install mr-boxington
+        uses: jdx/mise-action@v5
+        with:
+          install_args: mr-boxington
+
       - name: Run tests
-        run: cargo test --locked
+        run: mbx test --locked
 
       - name: Build release binary
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: mbx build --release --locked --target ${{ matrix.target }}
 
       - name: Verify static Linux binary
         if: matrix.linux

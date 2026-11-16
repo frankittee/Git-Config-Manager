@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.3.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.2.0..v1.3.0) - 2026-11-16
+
+#### Features
+- Detect gpg.format from signing key - ([34773d5](https://github.com/frankittee/Git-Config-Manager/commit/34773d58fb91ac984322b0a87838b82588bb0df3)) - frankittee
+- Add info --short and doctor - ([a85c37b](https://github.com/frankittee/Git-Config-Manager/commit/a85c37bd1048f6b3ab1f0c2d8eefd64c674011ae)) - frankittee
+
+#### Miscellaneous Chores
+- Run Rust commands through mbx - ([a0641ad](https://github.com/frankittee/Git-Config-Manager/commit/a0641ad92acd9a83fe507bbe41fde0a224f72c37)) - frankittee
+
+#### Continuous Integration
+- Drop x86_64 macOS release builds - ([6c2c91c](https://github.com/frankittee/Git-Config-Manager/commit/6c2c91c7e7a5910dafcbb41b25f88b41a8207d02)) - frankittee
+
 ## [v1.2.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.1.0..v1.2.0) - 2026-11-11
 
 #### Features

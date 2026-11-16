@@ -314,14 +314,14 @@ fn signing_is_enabled_and_then_cleared() {
         "--email",
         "signed@example.com",
         "--signing-key",
-        "ABC123",
+        "~/.ssh/id_ed25519.pub",
     ]));
     add(&context, "plain", "Plain User", "plain@example.com");
 
     assert_success(&context.g(&["use", "signed"]));
     assert_eq!(
         context.git_value("user.signingkey").as_deref(),
-        Some("ABC123")
+        Some("~/.ssh/id_ed25519.pub")
     );
     assert_eq!(context.git_value("commit.gpgsign").as_deref(), Some("true"));
     assert_eq!(context.git_value("gpg.format").as_deref(), Some("ssh"));
@@ -330,6 +330,25 @@ fn signing_is_enabled_and_then_cleared() {
     assert_eq!(context.git_value("user.signingkey"), None);
     assert_eq!(context.git_value("commit.gpgsign"), None);
     assert_eq!(context.git_value("gpg.format"), None);
+}
+
+#[test]
+fn hex_signing_key_uses_openpgp_format() {
+    let context = TestContext::new(true);
+    assert_success(&context.g(&[
+        "add",
+        "gpg",
+        "--name",
+        "Gpg User",
+        "--email",
+        "gpg@example.com",
+        "--signing-key",
+        "ABC123DE",
+    ]));
+
+    assert_success(&context.g(&["use", "gpg"]));
+    assert_eq!(context.git_value("commit.gpgsign").as_deref(), Some("true"));
+    assert_eq!(context.git_value("gpg.format").as_deref(), Some("openpgp"));
 }
 
 #[test]

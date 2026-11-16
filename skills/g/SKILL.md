@@ -39,7 +39,7 @@ g remove work
 
 - `g list` prints one name per line; with no profiles it prints a hint on stderr and exits 0.
 - A missing profile exits 1 and suggests `g list`.
-- `--signing-key` also enables `commit.gpgsign` and sets `gpg.format` to `ssh`, so the key must be an SSH key.
+- `--signing-key` also enables `commit.gpgsign` and sets `gpg.format` automatically: `openpgp` for hex key IDs or fingerprints (such as `ABC123DE`), `ssh` otherwise.
 - `--ssh-host` must be a literal `Host` alias declared in `~/.ssh/config` (or an included file); wildcards are rejected.
 
 ## Apply, verify, and remove
@@ -52,7 +52,7 @@ g -C /path/to/repo info
 g unuse
 ```
 
-- `g use` sets `user.name` and `user.email`. With a signing key it also sets `user.signingkey`, `commit.gpgsign=true`, and `gpg.format=ssh`; without one it removes those three keys.
+- `g use` sets `user.name` and `user.email`. With a signing key it also sets `user.signingkey`, `commit.gpgsign=true`, and `gpg.format` (`openpgp` for hex key IDs, `ssh` otherwise); without one it removes those three keys.
 - With an `ssh_host`, `g use` rewrites SSH fetch and push URLs of every remote in a repository to go through that alias. HTTPS and local URLs are left alone. Global scope never rewrites remotes.
 - `g info` prints the matching profile name, or `unmanaged` plus the current values.
 - `g unuse` unsets the five identity keys in the current scope and prints which file changed, or says nothing needed removing. It does not undo remote URL rewrites; use `g use <other-profile>` to rewrite them to another alias.

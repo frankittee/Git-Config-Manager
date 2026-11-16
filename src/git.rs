@@ -57,7 +57,7 @@ impl GitIdentity {
                         && self
                             .gpg_format
                             .as_deref()
-                            .is_some_and(|value| value.eq_ignore_ascii_case("ssh"))
+                            .is_some_and(|value| value.eq_ignore_ascii_case(signing_format(key)))
                 }
                 None => {
                     self.signing_key.is_none()
@@ -176,6 +176,17 @@ fn canonical_current_dir() -> Result<PathBuf> {
         .context("could not resolve the current directory")
 }
 
+/// Hex key IDs and fingerprints (optionally `0x`-prefixed) are OpenPGP keys; everything else
+/// (public key paths, `ssh-...` literals, `key::` values) is treated as an SSH key.
+pub fn signing_format(key: &str) -> &'static str {
+    let hex = key.strip_prefix("0x").unwrap_or(key);
+    if (8..=40).contains(&hex.len()) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        "openpgp"
+    } else {
+        "ssh"
+    }
+}
+
 fn apply(scope: ConfigScope, profile: &Profile) -> Result<()> {
     replace(scope, "user.name", &profile.name)?;
     replace(scope, "user.email", &profile.email)?;
@@ -183,7 +194,7 @@ fn apply(scope: ConfigScope, profile: &Profile) -> Result<()> {
         Some(key) => {
             replace(scope, "user.signingkey", key)?;
             replace(scope, "commit.gpgsign", "true")?;
-            replace(scope, "gpg.format", "ssh")?;
+            replace(scope, "gpg.format", signing_format(key))?;
         }
         None => {
             unset(scope, "user.signingkey")?;
@@ -465,6 +476,35 @@ mod tests {
             gpg_sign: Some("TRUE".into()),
             gpg_format: Some("ssh".into()),
         };
+        assert!(identity.matches(&profile));
+    }
+
+    #[test]
+    fn detects_signing_format_from_key() {
+        assert_eq!(signing_format("ABCD1234"), "openpgp");
+        assert_eq!(signing_format("0xABCD1234ABCD1234"), "openpgp");
+        assert_eq!(signing_format("~/.ssh/id_ed25519.pub"), "ssh");
+        assert_eq!(signing_format("ssh-ed25519 AAAA"), "ssh");
+        assert_eq!(signing_format("deadbeef.pub"), "ssh");
+    }
+
+    #[test]
+    fn openpgp_profile_requires_openpgp_format() {
+        let profile = Profile {
+            name: "A".into(),
+            email: "a@example.com".into(),
+            signing_key: Some("ABCD1234".into()),
+            ssh_host: None,
+        };
+        let mut identity = GitIdentity {
+            name: Some("A".into()),
+            email: Some("a@example.com".into()),
+            signing_key: Some("ABCD1234".into()),
+            gpg_sign: Some("true".into()),
+            gpg_format: Some("ssh".into()),
+        };
+        assert!(!identity.matches(&profile));
+        identity.gpg_format = Some("openpgp".into());
         assert!(identity.matches(&profile));
     }
 

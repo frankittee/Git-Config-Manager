@@ -204,7 +204,7 @@ Set `G_CONFIG_DIR` to override the containing directory, for example in isolated
 
 By default, `g use` updates the current repository's local Git configuration. When run directly from your home directory, it updates the global Git configuration instead.
 
-If a profile has a signing key, `g use` sets `user.signingkey` and enables `commit.gpgsign`. Applying a profile without a signing key removes both settings from the selected Git configuration scope.
+If a profile has a signing key, `g use` sets `user.signingkey`, enables `commit.gpgsign`, and sets `gpg.format` to `openpgp` for hex key IDs or fingerprints (such as `ABC123DE`) or `ssh` for everything else (such as `~/.ssh/id_ed25519.pub`). Applying a profile without a signing key removes these settings from the selected Git configuration scope.
 
 If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias exists in `~/.ssh/config` or an included configuration file, then rewrites SSH fetch URLs and explicit push URLs for every remote to use that alias. Include paths support paths relative to `~/.ssh`, absolute paths, `~`, nested includes, and glob wildcards. HTTPS and local URLs are left unchanged. Validation or write failures leave both identity and remote configuration unchanged.
 

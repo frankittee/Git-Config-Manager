@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Add per-profile SSH authentication public keys for repository push and fetch, with support for inline OpenSSH public keys and file paths.
 
+## [v1.4.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.3.0..v1.4.0) - 2026-11-18
+
+#### Features
+- Configure repository SSH authentication keys - ([c41672c](https://github.com/frankittee/Git-Config-Manager/commit/c41672cb27485908f5735bd581f6fdb7a1fd6f9b)) - frankittee
+
+#### Bug Fixes
+- Restore remote URLs and simplify profile prompts - ([1f93188](https://github.com/frankittee/Git-Config-Manager/commit/1f9318879c3d992fbda9a4d5d22cdd89b6fc23b3)) - frankittee
+
 ## [v1.3.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.2.0..v1.3.0) - 2026-11-16
 
 #### Features

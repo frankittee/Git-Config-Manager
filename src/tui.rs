@@ -28,16 +28,17 @@ use crate::{
     profiles::{Profile, ProfileStore, Profiles},
 };
 
-const FIELDS: [&str; 6] = [
+const FIELDS: [&str; 7] = [
     "Profile name",
     "Git author name",
     "Git author email",
     "Commit signing",
     "Signing key",
     "SSH host alias",
+    "SSH authentication public key",
 ];
 const MIN_WIDTH: u16 = 52;
-const MIN_HEIGHT: u16 = 22;
+const MIN_HEIGHT: u16 = 24;
 const WIDE_WIDTH: u16 = 90;
 
 struct Theme;
@@ -184,6 +185,7 @@ struct Form {
     signing_enabled: bool,
     signing_key: String,
     ssh_host: String,
+    ssh_auth_key: String,
 }
 
 impl Form {
@@ -197,6 +199,7 @@ impl Form {
             signing_enabled: false,
             signing_key: String::new(),
             ssh_host: String::new(),
+            ssh_auth_key: String::new(),
         }
     }
 
@@ -210,6 +213,7 @@ impl Form {
             signing_enabled: profile.signing_key.is_some(),
             signing_key: profile.signing_key.unwrap_or_default(),
             ssh_host: profile.ssh_host.unwrap_or_default(),
+            ssh_auth_key: profile.ssh_auth_key.unwrap_or_default(),
         }
     }
 
@@ -219,6 +223,7 @@ impl Form {
             email: self.email.clone(),
             signing_key: self.signing_enabled.then(|| self.signing_key.clone()),
             ssh_host: (!self.ssh_host.is_empty()).then(|| self.ssh_host.clone()),
+            ssh_auth_key: (!self.ssh_auth_key.is_empty()).then(|| self.ssh_auth_key.clone()),
         }
     }
 
@@ -251,6 +256,7 @@ impl Form {
             2 => Some(&mut self.email),
             4 if self.signing_enabled => Some(&mut self.signing_key),
             5 => Some(&mut self.ssh_host),
+            6 => Some(&mut self.ssh_auth_key),
             _ => None,
         }
     }
@@ -764,6 +770,10 @@ fn render_details(frame: &mut Frame, app: &App, area: Rect) {
                 Span::styled("SSH host     ", Theme::muted()),
                 optional_value(profile.ssh_host.as_deref()),
             ]),
+            Line::from(vec![
+                Span::styled("SSH auth key ", Theme::muted()),
+                optional_value(profile.ssh_auth_key.as_deref()),
+            ]),
             Line::from(""),
         ]);
     }
@@ -835,7 +845,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
-    let area = centered_rect(78, 22, frame.area());
+    let area = centered_rect(78, 25, frame.area());
     render_modal_backdrop(frame);
     frame.render_widget(Clear, area);
     let title = if form.mode == FormMode::Add {
@@ -867,6 +877,7 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
             Constraint::Length(2),
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Min(2),
         ])
         .split(inner);
@@ -877,8 +888,9 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
         "",
         form.signing_key.as_str(),
         form.ssh_host.as_str(),
+        form.ssh_auth_key.as_str(),
     ];
-    for (index, row) in rows.iter().take(6).enumerate() {
+    for (index, row) in rows.iter().take(FIELDS.len()).enumerate() {
         if index == 3 {
             let toggle = if form.signing_enabled {
                 "◉ Enabled"
@@ -925,7 +937,7 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
                 Span::styled(&message.text, message.style()),
             ]))
             .wrap(Wrap { trim: true }),
-            rows[6],
+            rows[FIELDS.len()],
         );
     }
 }
@@ -1182,6 +1194,7 @@ mod tests {
                     email: "a@example.com".into(),
                     signing_key: None,
                     ssh_host: None,
+                    ssh_auth_key: None,
                 },
             )
             .unwrap();
@@ -1193,6 +1206,7 @@ mod tests {
                     email: "b@example.com".into(),
                     signing_key: None,
                     ssh_host: None,
+                    ssh_auth_key: None,
                 },
             )
             .unwrap();
@@ -1224,6 +1238,7 @@ mod tests {
             email: "ada@example.com".into(),
             signing_key: None,
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let mut form = Form::edit("work".into(), profile);
         form.previous_field();
@@ -1308,6 +1323,7 @@ mod tests {
                     email: "a@example.com".into(),
                     signing_key: None,
                     ssh_host: None,
+                    ssh_auth_key: None,
                 },
             )
             .unwrap();
@@ -1335,6 +1351,7 @@ mod tests {
                     email: "ada@example.com".into(),
                     signing_key: None,
                     ssh_host: None,
+                    ssh_auth_key: None,
                 },
             )
             .unwrap();
@@ -1355,6 +1372,7 @@ mod tests {
             email: "ada@example.com".into(),
             signing_key: None,
             ssh_host: None,
+            ssh_auth_key: None,
         };
         app.store.add("work".into(), profile.clone()).unwrap();
         app.refresh(None).unwrap();

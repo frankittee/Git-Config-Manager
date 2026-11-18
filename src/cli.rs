@@ -38,6 +38,9 @@ pub enum Command {
         /// SSH host alias from ~/.ssh/config
         #[usage(long)]
         ssh_host: Option<String>,
+        /// OpenSSH public key text or file path for repository SSH authentication
+        #[usage(long)]
+        ssh_auth_key: Option<String>,
     },
     /// Edit an existing profile
     Edit {
@@ -61,6 +64,12 @@ pub enum Command {
         /// Remove the SSH host alias
         #[usage(long)]
         no_ssh_host: bool,
+        /// Set the repository SSH authentication public key text or file path
+        #[usage(long, conflicts = "no_ssh_auth_key")]
+        ssh_auth_key: Option<String>,
+        /// Clear the SSH authentication public key
+        #[usage(long)]
+        no_ssh_auth_key: bool,
     },
     /// List saved profile names
     List,

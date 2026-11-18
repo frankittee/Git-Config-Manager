@@ -163,7 +163,7 @@ g -C ../my-project info
 
 ## Removing an identity
 
-`g unuse` removes the identity that `g use` applies from the current scope: `user.name`, `user.email`, `user.signingkey`, `commit.gpgsign`, and `gpg.format`. It uses the same scope rules as `g use` (the repository's local configuration, or the global configuration from your home directory), restores the previous configuration if a write fails, and succeeds with a message when nothing is set. SSH remote URLs rewritten by `ssh_host` are left untouched.
+`g unuse` removes the identity that `g use` applies from the current scope: `user.name`, `user.email`, `user.signingkey`, `commit.gpgsign`, and `gpg.format`. It also restores the previous local SSH command when an SSH authentication key is active. It uses the same scope rules as `g use` (the repository's local configuration, or the global configuration from your home directory), restores the previous configuration if a write fails, and succeeds with a message when nothing is set. SSH remote URLs rewritten by `ssh_host` are left untouched.
 
 ## Sharing profiles
 
@@ -211,6 +211,22 @@ By default, `g use` updates the current repository's local Git configuration. Wh
 If a profile has a signing key, `g use` sets `user.signingkey`, enables `commit.gpgsign`, and sets `gpg.format` to `openpgp` for hex key IDs or fingerprints (such as `ABC123DE`) or `ssh` for everything else (such as `~/.ssh/id_ed25519.pub`). Applying a profile without a signing key removes these settings from the selected Git configuration scope.
 
 If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias exists in `~/.ssh/config` or an included configuration file, then rewrites SSH fetch URLs and explicit push URLs for every remote to use that alias. Include paths support paths relative to `~/.ssh`, absolute paths, `~`, nested includes, and glob wildcards. HTTPS and local URLs are left unchanged. Validation or write failures leave both identity and remote configuration unchanged.
+
+### SSH authentication keys for multiple GitHub accounts
+
+`g add work` prompts for an optional SSH authentication public key. Paste the public key, enter a `.pub` file path, or press Enter to skip.
+
+Load the matching private key into `ssh-agent`, add the public key to the corresponding GitHub account, and use an SSH remote such as `git@github.com:owner/repo.git`.
+
+```fish
+ssh-add ~/.ssh/github-work
+g edit work --ssh-auth-key ~/.ssh/github-work.pub
+g use work
+```
+
+`g use` copies the public key to `.git/ssh/g-auth.pub` and sets the repository's `core.sshCommand`. This applies to SSH push and fetch. Without `--ssh-host`, OpenSSH skips SSH configuration files and offers the selected key. With `--ssh-host`, OpenSSH loads its normal configuration so the alias works. Keep the alias's `IdentityFile` entries limited to the same account, since OpenSSH can also offer those identities.
+
+`--ssh-auth-key` also accepts the complete OpenSSH public key line as a quoted argument. For example, `g edit work --ssh-auth-key "$(cat ~/.ssh/github-work.pub)"` saves the key contents in the profile. `g edit work --no-ssh-auth-key` clears the saved key. Applying a profile without an SSH authentication key or running `g unuse` restores the repository's previous SSH command. Public key paths support `~/`. Relative paths are resolved from the directory where `g use` runs. Profiles with an SSH authentication key require repository scope.
 
 <details>
 <summary><strong>Release process</strong></summary>

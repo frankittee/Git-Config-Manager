@@ -57,7 +57,15 @@ pub fn run(initial: Profile, signing: bool, aliases: Vec<String>) -> Result<Prof
         email,
         signing_key,
         ssh_host: (!ssh_host.is_empty()).then_some(ssh_host),
+        ssh_auth_key: initial.ssh_auth_key,
     })
+}
+
+pub fn ssh_auth_key() -> Result<Option<String>> {
+    let key = ask(Input::new("SSH authentication public key").description(
+        "Paste an OpenSSH public key or enter a .pub file path. Leave blank to skip.",
+    ))?;
+    Ok((!key.is_empty()).then_some(key))
 }
 
 fn ask(input: Input) -> Result<String> {

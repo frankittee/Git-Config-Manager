@@ -41,6 +41,7 @@ g remove work
 - A missing profile exits 1 and suggests `g list`.
 - `--signing-key` also enables `commit.gpgsign` and sets `gpg.format` automatically: `openpgp` for hex key IDs or fingerprints (such as `ABC123DE`), `ssh` otherwise.
 - `--ssh-host` must be a literal `Host` alias declared in `~/.ssh/config` (or an included file); wildcards are rejected.
+- Use `g add <profile> --name <name> --email <email> --ssh-auth-key <key-or-path>` or `g edit <profile> --ssh-auth-key <key-or-path>` to save a quoted OpenSSH public key line or a public key file path for authentication. Load its matching private key into `ssh-agent`. Use `g edit <profile> --no-ssh-auth-key` to clear the key.
 
 ## Apply, verify, and remove
 
@@ -56,6 +57,7 @@ g unuse
 
 - `g use` sets `user.name` and `user.email`. With a signing key it also sets `user.signingkey`, `commit.gpgsign=true`, and `gpg.format` (`openpgp` for hex key IDs, `ssh` otherwise); without one it removes those three keys.
 - With an `ssh_host`, `g use` rewrites SSH fetch and push URLs of every remote in a repository to go through that alias. HTTPS and local URLs are left alone. Global scope never rewrites remotes.
+- With a `ssh_auth_key`, `g use` requires repository scope, copies the public key into `.git/ssh/g-auth.pub`, and sets `core.sshCommand` for both SSH push and fetch. OpenSSH skips its config files unless an `ssh_host` is configured. Applying a profile without an SSH authentication key or running `g unuse` restores the former SSH command.
 - `g info` prints the matching profile name, or `unmanaged` plus the current values. `g info --short` prints only the name and never fails, which suits shell prompts.
 - `g doctor` checks every saved profile for a missing SSH signing key file, an undeclared `ssh_host` alias, and an unset `gpg.ssh.allowedSignersFile` (warning only). It exits 1 when any error is found.
 - `g unuse` unsets the five identity keys in the current scope and prints which file changed, or says nothing needed removing. It does not undo remote URL rewrites; use `g use <other-profile>` to rewrite them to another alias.
@@ -70,7 +72,7 @@ g export work | g import work2
 g import work work.toml --force
 ```
 
-The format is plain TOML with `name`, `email`, and optional `signing_key` and `ssh_host`. `g import` reads standard input when the file is omitted or `-`, validates the profile, and refuses to overwrite an existing profile without `--force`. Keep exported files private.
+The format is plain TOML with `name`, `email`, and optional `signing_key`, `ssh_host`, and `ssh_auth_key`. `g import` reads standard input when the file is omitted or `-`, validates the profile, and refuses to overwrite an existing profile without `--force`. Keep exported files private.
 
 ## Completion
 

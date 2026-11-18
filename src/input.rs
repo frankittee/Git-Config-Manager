@@ -9,6 +9,7 @@ pub fn collect_profile(
     email: Option<String>,
     signing_key: Option<String>,
     ssh_host: Option<String>,
+    ssh_auth_key: Option<String>,
     reader: &mut impl BufRead,
     writer: &mut impl Write,
 ) -> Result<Profile> {
@@ -32,11 +33,20 @@ pub fn collect_profile(
         None => prompt_optional("SSH host alias (leave blank to skip): ", reader, writer)?,
     };
 
+    let ssh_auth_key = match ssh_auth_key {
+        Some(key) => Some(key),
+        None => prompt_optional(
+            "SSH authentication public key (key or .pub file path, leave blank to skip): ",
+            reader,
+            writer,
+        )?,
+    };
     Ok(Profile {
         name,
         email,
         signing_key,
         ssh_host,
+        ssh_auth_key,
     })
 }
 
@@ -69,6 +79,7 @@ pub fn edit_profile(
         email,
         signing_key,
         ssh_host,
+        ssh_auth_key: current.ssh_auth_key,
     })
 }
 
@@ -208,6 +219,7 @@ mod tests {
             email.map(str::to_owned),
             signing_key.map(str::to_owned),
             ssh_host.map(str::to_owned),
+            None,
             &mut reader,
             &mut output,
         );
@@ -216,7 +228,7 @@ mod tests {
 
     #[test]
     fn collects_unsigned_profile_in_order() {
-        let (result, output) = collect(None, None, None, None, " Ada \n ada@example.com \n\n\n");
+        let (result, output) = collect(None, None, None, None, " Ada \n ada@example.com \n\n\n\n");
         assert_eq!(
             result.unwrap(),
             Profile {
@@ -224,28 +236,34 @@ mod tests {
                 email: "ada@example.com".into(),
                 signing_key: None,
                 ssh_host: None,
+                ssh_auth_key: None,
             }
         );
         assert_eq!(
             output,
-            "Git author name: Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): "
+            "Git author name: Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
         );
     }
 
     #[test]
     fn only_prompts_for_missing_required_values() {
-        let (result, output) = collect(Some("Ada"), None, None, None, "ada@example.com\nno\n\n");
+        let (result, output) = collect(Some("Ada"), None, None, None, "ada@example.com\nno\n\n\n");
         assert_eq!(result.unwrap().email, "ada@example.com");
         assert_eq!(
             output,
-            "Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): "
+            "Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
         );
     }
 
     #[test]
     fn collects_signing_key_after_confirmation() {
-        let (result, output) =
-            collect(None, None, None, None, "Ada\na@example.com\nYES\n KEY \n\n");
+        let (result, output) = collect(
+            None,
+            None,
+            None,
+            None,
+            "Ada\na@example.com\nYES\n KEY \n\n\n",
+        );
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
         assert!(output.contains("Signing key: "));
     }
@@ -257,7 +275,7 @@ mod tests {
             None,
             None,
             None,
-            "\nAda\n\na@example.com\nmaybe\ny\nKEY\n\n",
+            "\nAda\n\na@example.com\nmaybe\ny\nKEY\n\n\n",
         );
         assert!(result.is_ok());
         assert_eq!(output.matches("Git author name: ").count(), 2);
@@ -269,9 +287,24 @@ mod tests {
 
     #[test]
     fn provided_signing_key_skips_confirmation() {
-        let (result, output) = collect(None, None, Some("KEY"), None, "Ada\na@example.com\n\n");
+        let (result, output) = collect(None, None, Some("KEY"), None, "Ada\na@example.com\n\n\n");
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
         assert!(!output.contains("Enable commit signing?"));
+    }
+
+    #[test]
+    fn collects_optional_ssh_auth_key_without_commit_signing() {
+        let (result, _) = collect(
+            None,
+            None,
+            None,
+            None,
+            "Ada\na@example.com\n\n\n ~/.ssh/work.pub \n",
+        );
+        assert_eq!(
+            result.unwrap().ssh_auth_key.as_deref(),
+            Some("~/.ssh/work.pub")
+        );
     }
 
     #[test]
@@ -287,6 +320,7 @@ mod tests {
             email: "ada@example.com".into(),
             signing_key: Some("KEY".into()),
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let mut reader = Cursor::new(b"\n\n\n\n\n");
         let mut output = Vec::new();
@@ -306,6 +340,7 @@ mod tests {
             email: "old@example.com".into(),
             signing_key: Some("KEY".into()),
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let mut reader = Cursor::new(b"New\nnew@example.com\nno\n\n");
         let mut output = Vec::new();

@@ -21,6 +21,8 @@ pub struct Profile {
     pub signing_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ssh_host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_auth_key: Option<String>,
 }
 
 impl Profile {
@@ -225,6 +227,20 @@ fn validate_profile(profile: &Profile) -> Result<()> {
     }) {
         bail!("SSH host alias must be literal, non-empty, and contain no whitespace");
     }
+    if profile
+        .ssh_auth_key
+        .as_ref()
+        .is_some_and(|key| key.trim().is_empty())
+    {
+        bail!("SSH authentication public key must not be empty");
+    }
+    if profile
+        .ssh_auth_key
+        .as_ref()
+        .is_some_and(|key| key.trim_start().starts_with("-----BEGIN "))
+    {
+        bail!("SSH authentication requires an OpenSSH public key or public key file path");
+    }
     Ok(())
 }
 
@@ -251,6 +267,7 @@ mod tests {
             email: email.into(),
             signing_key: None,
             ssh_host: None,
+            ssh_auth_key: None,
         }
     }
 

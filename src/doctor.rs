@@ -100,6 +100,7 @@ mod tests {
             email: "a@example.com".into(),
             signing_key: key.map(str::to_owned),
             ssh_host: host.map(str::to_owned),
+            ssh_auth_key: None,
         }
     }
 

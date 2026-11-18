@@ -44,6 +44,7 @@ fn run() -> Result<()> {
             email,
             signing_key,
             ssh_host,
+            ssh_auth_key,
         }) => {
             let interactive = name.is_none() || email.is_none();
             let value = if interactive {
@@ -58,8 +59,14 @@ fn run() -> Result<()> {
                         email: email.unwrap_or_default(),
                         signing_key,
                         ssh_host,
+                        ssh_auth_key: None,
                     };
-                    prompt::run(initial, signing, ssh_aliases())?
+                    let mut value = prompt::run(initial, signing, ssh_aliases())?;
+                    value.ssh_auth_key = match ssh_auth_key {
+                        Some(key) => Some(key),
+                        None => prompt::ssh_auth_key()?,
+                    };
+                    value
                 } else {
                     let mut stdin = io::stdin().lock();
                     let mut stderr = io::stderr().lock();
@@ -68,6 +75,7 @@ fn run() -> Result<()> {
                         email,
                         signing_key,
                         ssh_host,
+                        ssh_auth_key,
                         &mut stdin,
                         &mut stderr,
                     )?
@@ -78,6 +86,7 @@ fn run() -> Result<()> {
                     email: email.expect("email is present in non-interactive mode"),
                     signing_key,
                     ssh_host,
+                    ssh_auth_key,
                 }
             };
             store.add(profile.clone(), value)?;
@@ -91,6 +100,8 @@ fn run() -> Result<()> {
             no_signing,
             ssh_host,
             no_ssh_host,
+            ssh_auth_key,
+            no_ssh_auth_key,
         }) => {
             let current = store.get(&profile)?;
             let has_options = name.is_some()
@@ -98,7 +109,9 @@ fn run() -> Result<()> {
                 || signing_key.is_some()
                 || no_signing
                 || ssh_host.is_some()
-                || no_ssh_host;
+                || no_ssh_host
+                || ssh_auth_key.is_some()
+                || no_ssh_auth_key;
             let value = if has_options {
                 profiles::Profile {
                     name: name.unwrap_or(current.name),
@@ -112,6 +125,11 @@ fn run() -> Result<()> {
                         None
                     } else {
                         ssh_host.or(current.ssh_host)
+                    },
+                    ssh_auth_key: if no_ssh_auth_key {
+                        None
+                    } else {
+                        ssh_auth_key.or(current.ssh_auth_key)
                     },
                 }
             } else {
@@ -150,6 +168,9 @@ fn run() -> Result<()> {
             }
             if let Some(ssh_host) = value.ssh_host {
                 println!("ssh_host={ssh_host}");
+            }
+            if let Some(ssh_auth_key) = value.ssh_auth_key {
+                println!("ssh_auth_key={ssh_auth_key}");
             }
         }
         Some(cli::Command::Remove { profile }) => {

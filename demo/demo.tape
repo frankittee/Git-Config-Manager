@@ -2,6 +2,7 @@
 Output demo/demo.gif
 
 Require git
+Require ssh-keygen
 
 Set Shell "bash"
 Set FontSize 20
@@ -17,7 +18,7 @@ Type `export PATH="$PWD/target/release:$PATH" HOME="$(mktemp -d)" PS1='\[\e[1;35
 Enter
 Type `mkdir -p ~/.ssh && printf 'Host github-personal github-work\n  HostName github.com\n' > ~/.ssh/config`
 Enter
-Type `rm -rf /tmp/my-project && git init -q /tmp/my-project && cd /tmp/my-project && git remote add origin git@github.com:ada/my-project.git && g --version >/dev/null && clear`
+Type `ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/github-work && git init -q "$HOME/my-project" && cd "$HOME/my-project" && git remote add origin git@github.com:ada/my-project.git && g --version >/dev/null && clear`
 Enter
 # Only start recording once the setup has finished and the screen holds just the prompt.
 Wait+Screen@20s /(?s)\A\s*❯\s*\z/
@@ -52,6 +53,8 @@ Tab
 Sleep 1s
 Enter
 Sleep 1.5s
+Enter
+Sleep 500ms
 
 # Scriptable add
 Type `g add personal --name "Ada Lovelace" --email ada@example.com`
@@ -64,6 +67,9 @@ Enter
 Sleep 1s
 
 # Apply and verify
+Type "g edit work --ssh-auth-key ~/.ssh/github-work.pub"
+Enter
+Sleep 1s
 Type "g use work"
 Enter
 Sleep 1s
@@ -71,6 +77,9 @@ Type "g info"
 Enter
 Sleep 1s
 Type "git remote get-url origin"
+Enter
+Sleep 1s
+Type "ls .git/ssh"
 Enter
 Sleep 2s
 
@@ -96,5 +105,5 @@ Sleep 2.5s
 
 # Clean up the throwaway repository, HOME and profile store.
 Hide
-Type `cd / && rm -rf /tmp/my-project "$HOME"`
+Type `cd / && rm -rf "$HOME"`
 Enter

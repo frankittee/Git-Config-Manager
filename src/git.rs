@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeSet,
-    env,
+    env, fs,
+    io::Write,
     path::PathBuf,
     process::{Command, Output},
 };
@@ -8,6 +9,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use directories::BaseDirs;
 use ssh2_config_rs::{ParseRule, SshConfig};
+use tempfile::NamedTempFile;
 
 use crate::profiles::Profile;
 
@@ -18,6 +20,9 @@ const IDENTITY_KEYS: [&str; 5] = [
     "commit.gpgsign",
     "gpg.format",
 ];
+const SSH_COMMAND: &str = "core.sshCommand";
+const SSH_MANAGED: &str = "g.sshAuthKeyManaged";
+const SSH_PREVIOUS: &str = "g.previousSshCommand";
 
 #[derive(Clone, Copy)]
 enum ConfigScope {
@@ -115,26 +120,58 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
     let remote_updates = remote_updates(scope, profile.ssh_host.as_deref())?;
     let mut keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
     keys.extend(remote_updates.iter().map(|update| update.key.clone()));
+    let managed = matches!(scope, ConfigScope::Local) && ssh_auth_key_managed(scope)?;
+    let ssh_auth_key = match &profile.ssh_auth_key {
+        Some(path) if matches!(scope, ConfigScope::Local) => {
+            Some(prepare_ssh_auth_key(path, profile.ssh_host.is_some())?)
+        }
+        Some(_) => bail!("an SSH auth key requires a Git repository"),
+        None => None,
+    };
+    if managed || ssh_auth_key.is_some() {
+        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS].map(str::to_owned));
+    }
     let original = snapshot(scope, &keys)?;
     let result = apply(scope, profile);
     let result = result.and_then(|()| apply_remote_updates(scope, &remote_updates));
+    let result = result.and_then(|()| {
+        let origin = config_origin(scope, "user.name")?;
+        if let Some((key, path, command)) = ssh_auth_key {
+            if !managed {
+                for value in get_all(scope, SSH_COMMAND)? {
+                    add(scope, SSH_PREVIOUS, &value)?;
+                }
+                replace(scope, SSH_MANAGED, "true")?;
+            }
+            replace(scope, SSH_COMMAND, &command)?;
+            key.persist(&path)
+                .with_context(|| format!("could not install public key at {}", path.display()))?;
+        } else if managed {
+            restore_ssh_command(scope)?;
+        }
+        Ok(origin)
+    });
     if let Err(error) = result {
         if let Err(rollback_error) = restore(scope, &original) {
             return Err(error.context(format!("rollback also failed: {rollback_error:#}")));
         }
         return Err(error.context("Git configuration was restored"));
     }
-    config_origin(scope, "user.name")
+    result
 }
 
-/// Remove the identity keys that `apply_profile` manages. Remote URLs are left untouched.
+/// Remove the identity keys and SSH command that `apply_profile` manages.
 /// Returns the config file that was changed, or `None` when nothing was set.
 pub fn remove_identity() -> Result<Option<String>> {
     let scope = config_scope()?;
     if matches!(scope, ConfigScope::Local) {
         ensure_repository()?;
     }
-    let keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    let managed = matches!(scope, ConfigScope::Local) && ssh_auth_key_managed(scope)?;
+    let mut keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    if managed {
+        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS].map(str::to_owned));
+    }
     let original = snapshot(scope, &keys)?;
     let Some(origin_key) = original
         .iter()
@@ -144,7 +181,15 @@ pub fn remove_identity() -> Result<Option<String>> {
         return Ok(None);
     };
     let config_file = config_origin(scope, &origin_key)?;
-    let result = keys.iter().try_for_each(|key| unset(scope, key));
+    let result = IDENTITY_KEYS
+        .iter()
+        .try_for_each(|key| unset(scope, key))
+        .and_then(|()| {
+            if managed {
+                restore_ssh_command(scope)?;
+            }
+            Ok(())
+        });
     if let Err(error) = result {
         if let Err(rollback_error) = restore(scope, &original) {
             return Err(error.context(format!("rollback also failed: {rollback_error:#}")));
@@ -152,6 +197,83 @@ pub fn remove_identity() -> Result<Option<String>> {
         return Err(error.context("Git configuration was restored"));
     }
     Ok(Some(config_file))
+}
+
+fn ssh_auth_key_managed(scope: ConfigScope) -> Result<bool> {
+    Ok(get_all(scope, SSH_MANAGED)?
+        .last()
+        .is_some_and(|value| value == "true"))
+}
+
+fn restore_ssh_command(scope: ConfigScope) -> Result<()> {
+    let previous = get_all(scope, SSH_PREVIOUS)?;
+    restore(scope, &[(SSH_COMMAND.to_owned(), previous)])?;
+    unset(scope, SSH_PREVIOUS)?;
+    unset(scope, SSH_MANAGED)
+}
+
+fn prepare_ssh_auth_key(
+    source: &str,
+    use_ssh_config: bool,
+) -> Result<(NamedTempFile, PathBuf, String)> {
+    let key_prefixes = ["ssh-", "ecdsa-", "sk-"];
+    let (contents, label) = if source
+        .trim()
+        .split_once(char::is_whitespace)
+        .is_some_and(|(kind, _)| key_prefixes.iter().any(|prefix| kind.starts_with(prefix)))
+    {
+        (source.to_owned(), "inline SSH auth key".to_owned())
+    } else {
+        let path = match source.strip_prefix("~/") {
+            Some(relative) => home_dir()?.join(relative),
+            None => PathBuf::from(source),
+        };
+        let label = format!("SSH public key file {}", path.display());
+        let contents =
+            fs::read_to_string(&path).with_context(|| format!("could not read {label}"))?;
+        (contents, label)
+    };
+    let mut fields = contents.split_whitespace();
+    let (Some(kind), Some(encoded)) = (fields.next(), fields.next()) else {
+        bail!("{label} is not an OpenSSH public key");
+    };
+    if !key_prefixes.iter().any(|prefix| kind.starts_with(prefix))
+        || !encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"+/=".contains(&byte))
+        || contents.trim().lines().count() != 1
+    {
+        bail!("{label} is not an OpenSSH public key");
+    }
+
+    let output = run_git(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    if !output.status.success() {
+        return Err(git_failure("locate", "git-common-dir", &output));
+    }
+    let git_dir = String::from_utf8(output.stdout).context("Git returned a non-UTF-8 directory")?;
+    let directory = PathBuf::from(git_dir.trim_end_matches('\n')).join("ssh");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("could not create {}", directory.display()))?;
+    let mut key = NamedTempFile::new_in(&directory).context("could not stage SSH public key")?;
+    writeln!(key, "{}", contents.trim()).context("could not write SSH public key")?;
+    let status = Command::new("ssh-keygen")
+        .args(["-lf", "-"])
+        .stdin(key.reopen().context("could not reopen SSH public key")?)
+        .output()
+        .context("could not run ssh-keygen to validate the SSH public key")?
+        .status;
+    if !status.success() {
+        bail!("{label} is not a valid OpenSSH public key");
+    }
+    let path = directory.join("g-auth.pub");
+    let identity = path.to_str().context("SSH public key path is not UTF-8")?;
+    if identity.contains("${") {
+        bail!("SSH public key installation path contains an OpenSSH variable expression");
+    }
+    let identity = identity.replace('%', "%%").replace('\'', "'\\''");
+    let config = if use_ssh_config { "" } else { " -F /dev/null" };
+    let command = format!("ssh{config} -o IdentitiesOnly=yes -i '{identity}'");
+    Ok((key, path, command))
 }
 
 fn config_scope() -> Result<ConfigScope> {
@@ -394,10 +516,10 @@ fn config_origin(scope: ConfigScope, key: &str) -> Result<String> {
 }
 
 fn get_all(scope: ConfigScope, key: &str) -> Result<Vec<String>> {
-    let output = run_git(&["config", scope.argument(), "--get-all", key])?;
+    let output = run_git(&["config", scope.argument(), "-z", "--get-all", key])?;
     if output.status.success() {
         let stdout = String::from_utf8(output.stdout).context("Git returned non-UTF-8 output")?;
-        Ok(stdout.lines().map(str::to_owned).collect())
+        Ok(stdout.split_terminator('\0').map(str::to_owned).collect())
     } else if output.status.code() == Some(1) {
         Ok(Vec::new())
     } else {
@@ -464,6 +586,7 @@ mod tests {
             email: "a@example.com".into(),
             signing_key: None,
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let matching = GitIdentity {
             name: Some("A".into()),
@@ -486,6 +609,7 @@ mod tests {
             email: "a@example.com".into(),
             signing_key: Some("KEY".into()),
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let identity = GitIdentity {
             name: Some("A".into()),
@@ -513,6 +637,7 @@ mod tests {
             email: "a@example.com".into(),
             signing_key: Some("ABCD1234".into()),
             ssh_host: None,
+            ssh_auth_key: None,
         };
         let mut identity = GitIdentity {
             name: Some("A".into()),

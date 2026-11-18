@@ -264,6 +264,74 @@ fn edit_validates_target_and_non_terminal_input() {
 }
 
 #[test]
+fn switches_ssh_auth_keys_and_restores_the_previous_command() {
+    let context = TestContext::new(true);
+    let previous = "ssh -o BatchMode=yes";
+    context.git(&["config", "--local", "core.sshCommand", previous]);
+    let installed = context.repository.path().join(".git/ssh/g-auth.pub");
+    for profile in ["personal", "work"] {
+        let private_key = context.home.path().join(format!("{profile} key"));
+        assert_success(
+            &Command::new("ssh-keygen")
+                .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+                .arg(&private_key)
+                .output()
+                .unwrap(),
+        );
+        let public_key = private_key.with_extension("pub");
+        let expected = fs::read_to_string(&public_key).unwrap();
+        let ssh_auth_key = if profile == "personal" {
+            format!("~/{profile} key.pub")
+        } else {
+            fs::remove_file(&public_key).unwrap();
+            expected.clone()
+        };
+        add(&context, profile, profile, "git@example.com");
+        assert_success(&context.g(&["edit", profile, "--ssh-auth-key", &ssh_auth_key]));
+        assert_success(&context.g(&["use", profile]));
+        assert_eq!(fs::read_to_string(&installed).unwrap(), expected);
+        let command = context.git_value("core.sshCommand").unwrap();
+        let config = Command::new("sh")
+            .args(["-c", &format!("{command} -G git@github.com")])
+            .output()
+            .unwrap();
+        assert_success(&config);
+        let config = stdout(&config);
+        assert!(config.contains("identitiesonly yes"));
+        let identity = format!(
+            "identityfile {}",
+            installed.canonicalize().unwrap().display()
+        );
+        assert_eq!(
+            config
+                .lines()
+                .filter(|line| line.starts_with("identityfile "))
+                .collect::<Vec<_>>(),
+            [identity.as_str()]
+        );
+    }
+
+    let previous_key = fs::read(&installed).unwrap();
+    assert_success(&context.g(&["edit", "personal", "--ssh-auth-key", "~/personal key"]));
+    assert!(!context.g(&["use", "personal"]).status.success());
+    assert_eq!(fs::read(&installed).unwrap(), previous_key);
+    assert_eq!(context.git_value("user.name").as_deref(), Some("work"));
+
+    assert_success(&context.g(&["edit", "personal", "--no-ssh-auth-key"]));
+    assert_success(&context.g(&["use", "personal"]));
+    assert_eq!(
+        context.git_value("core.sshCommand").as_deref(),
+        Some(previous)
+    );
+    assert_success(&context.g(&["use", "work"]));
+    assert_success(&context.g(&["unuse"]));
+    assert_eq!(
+        context.git_value("core.sshCommand").as_deref(),
+        Some(previous)
+    );
+}
+
+#[test]
 fn applies_profiles_and_reports_current() {
     let context = TestContext::new(true);
     add(&context, "work", "Work User", "work@example.com");

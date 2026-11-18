@@ -53,7 +53,6 @@ fn run() -> Result<()> {
                     bail!("interactive input requires a terminal; provide both --name and --email");
                 }
                 if io::stderr().is_terminal() {
-                    let signing = signing_key.is_some();
                     let initial = profiles::Profile {
                         name: name.unwrap_or_default(),
                         email: email.unwrap_or_default(),
@@ -61,7 +60,7 @@ fn run() -> Result<()> {
                         ssh_host,
                         ssh_auth_key: None,
                     };
-                    let mut value = prompt::run(initial, signing, ssh_aliases())?;
+                    let mut value = prompt::run(initial, ssh_aliases())?;
                     value.ssh_auth_key = match ssh_auth_key {
                         Some(key) => Some(key),
                         None => prompt::ssh_auth_key()?,
@@ -139,8 +138,7 @@ fn run() -> Result<()> {
                     );
                 }
                 if io::stderr().is_terminal() {
-                    let signing = current.signing_key.is_some();
-                    prompt::run(current, signing, ssh_aliases())?
+                    prompt::run(current, ssh_aliases())?
                 } else {
                     let mut stdin = io::stdin().lock();
                     let mut stderr = io::stderr().lock();

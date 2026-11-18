@@ -28,17 +28,16 @@ use crate::{
     profiles::{Profile, ProfileStore, Profiles},
 };
 
-const FIELDS: [&str; 7] = [
+const FIELDS: [&str; 6] = [
     "Profile name",
     "Git author name",
     "Git author email",
-    "Commit signing",
-    "Signing key",
-    "SSH host alias",
-    "SSH authentication public key",
+    "Signing key (optional)",
+    "SSH host alias (optional)",
+    "SSH authentication public key (optional)",
 ];
 const MIN_WIDTH: u16 = 52;
-const MIN_HEIGHT: u16 = 24;
+const MIN_HEIGHT: u16 = 22;
 const WIDE_WIDTH: u16 = 90;
 
 struct Theme;
@@ -182,7 +181,6 @@ struct Form {
     profile_name: String,
     author_name: String,
     email: String,
-    signing_enabled: bool,
     signing_key: String,
     ssh_host: String,
     ssh_auth_key: String,
@@ -196,7 +194,6 @@ impl Form {
             profile_name: String::new(),
             author_name: String::new(),
             email: String::new(),
-            signing_enabled: false,
             signing_key: String::new(),
             ssh_host: String::new(),
             ssh_auth_key: String::new(),
@@ -210,7 +207,6 @@ impl Form {
             profile_name: name,
             author_name: profile.name,
             email: profile.email,
-            signing_enabled: profile.signing_key.is_some(),
             signing_key: profile.signing_key.unwrap_or_default(),
             ssh_host: profile.ssh_host.unwrap_or_default(),
             ssh_auth_key: profile.ssh_auth_key.unwrap_or_default(),
@@ -221,9 +217,9 @@ impl Form {
         Profile {
             name: self.author_name.clone(),
             email: self.email.clone(),
-            signing_key: self.signing_enabled.then(|| self.signing_key.clone()),
+            signing_key: (!self.signing_key.trim().is_empty()).then(|| self.signing_key.clone()),
             ssh_host: (!self.ssh_host.is_empty()).then(|| self.ssh_host.clone()),
-            ssh_auth_key: (!self.ssh_auth_key.is_empty()).then(|| self.ssh_auth_key.clone()),
+            ssh_auth_key: (!self.ssh_auth_key.trim().is_empty()).then(|| self.ssh_auth_key.clone()),
         }
     }
 
@@ -246,7 +242,7 @@ impl Form {
     }
 
     fn field_is_editable(&self, field: usize) -> bool {
-        !(self.mode == FormMode::Edit && field == 0) && (field != 4 || self.signing_enabled)
+        self.mode != FormMode::Edit || field != 0
     }
 
     fn value_mut(&mut self) -> Option<&mut String> {
@@ -254,9 +250,9 @@ impl Form {
             0 if self.mode == FormMode::Add => Some(&mut self.profile_name),
             1 => Some(&mut self.author_name),
             2 => Some(&mut self.email),
-            4 if self.signing_enabled => Some(&mut self.signing_key),
-            5 => Some(&mut self.ssh_host),
-            6 => Some(&mut self.ssh_auth_key),
+            3 => Some(&mut self.signing_key),
+            4 => Some(&mut self.ssh_host),
+            5 => Some(&mut self.ssh_auth_key),
             _ => None,
         }
     }
@@ -362,7 +358,7 @@ impl App {
     fn handle_key(&mut self, key: KeyEvent) {
         match self.modal.take() {
             Some(Modal::Form(mut form)) => {
-                if key.code == KeyCode::Char(' ') && form.field == 5 {
+                if key.code == KeyCode::Char(' ') && form.field == 4 {
                     self.open_ssh_host_picker(form);
                 } else if !self.handle_form_key(&mut form, key) {
                     self.modal = Some(Modal::Form(form));
@@ -424,18 +420,7 @@ impl App {
                 form.previous_field();
                 false
             }
-            KeyCode::Char(' ') if form.field == 3 => {
-                form.signing_enabled = !form.signing_enabled;
-                false
-            }
-            KeyCode::Enter => {
-                if form.field == 3 {
-                    form.signing_enabled = !form.signing_enabled;
-                    false
-                } else {
-                    self.save_form(form)
-                }
-            }
+            KeyCode::Enter => self.save_form(form),
             KeyCode::Backspace => {
                 if let Some(value) = form.value_mut() {
                     value.pop();
@@ -824,7 +809,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
         Some(Modal::Form(_)) => help_line(&[
             ("Tab", "next"),
             ("↑/↓", "field"),
-            ("Space", "toggle/select SSH host"),
+            ("Space", "select SSH host"),
             ("Enter", "save"),
             ("Esc", "cancel"),
         ]),
@@ -845,7 +830,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
-    let area = centered_rect(78, 25, frame.area());
+    let area = centered_rect(90, 22, frame.area());
     render_modal_backdrop(frame);
     frame.render_widget(Clear, area);
     let title = if form.mode == FormMode::Add {
@@ -874,7 +859,6 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Length(2),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
@@ -885,61 +869,33 @@ fn render_form(frame: &mut Frame, form: &Form, status: Option<&StatusMessage>) {
         form.profile_name.as_str(),
         form.author_name.as_str(),
         form.email.as_str(),
-        "",
         form.signing_key.as_str(),
         form.ssh_host.as_str(),
         form.ssh_auth_key.as_str(),
     ];
     for (index, row) in rows.iter().take(FIELDS.len()).enumerate() {
-        if index == 3 {
-            let toggle = if form.signing_enabled {
-                "◉ Enabled"
-            } else {
-                "○ Disabled"
-            };
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled("Commit signing  ", Theme::muted()),
-                    Span::styled(
-                        toggle,
-                        if form.field == index {
-                            Theme::key()
-                        } else {
-                            Style::default()
-                        },
-                    ),
-                ])),
-                *row,
-            );
-            continue;
-        }
         let read_only = form.mode == FormMode::Edit && index == 0;
-        let disabled = index == 4 && !form.signing_enabled;
         render_input(
             frame,
             *row,
-            if index == 5 {
-                "SSH host alias (Space to choose)"
-            } else {
-                FIELDS[index]
-            },
+            FIELDS[index],
             values[index],
             form.field == index,
             read_only,
-            disabled,
         );
     }
 
-    if let Some(message) = status.filter(|message| message.level == StatusLevel::Error) {
-        frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled("✕ ", message.style()),
-                Span::styled(&message.text, message.style()),
-            ]))
-            .wrap(Wrap { trim: true }),
-            rows[FIELDS.len()],
-        );
-    }
+    let footer = match status.filter(|message| message.level == StatusLevel::Error) {
+        Some(message) => Paragraph::new(Line::from(vec![
+            Span::styled("✕ ", message.style()),
+            Span::styled(&message.text, message.style()),
+        ])),
+        None if form.field == 4 => {
+            Paragraph::new("Space selects SSH host · Enter saves").style(Theme::muted())
+        }
+        None => Paragraph::new("Tab moves · Enter saves").style(Theme::muted()),
+    };
+    frame.render_widget(footer.wrap(Wrap { trim: true }), rows[FIELDS.len()]);
 }
 
 fn render_ssh_host_picker(frame: &mut Frame, aliases: &[String], selected: usize) {
@@ -998,7 +954,6 @@ fn render_input(
     value: &str,
     focused: bool,
     read_only: bool,
-    disabled: bool,
 ) {
     let suffix = if read_only { "  locked" } else { "" };
     let title = Line::from(vec![
@@ -1023,13 +978,9 @@ fn render_input(
         .title(title);
     let inner = block.inner(area);
     let available = inner.width.saturating_sub(1) as usize;
-    let shown = if disabled {
-        "Disabled".to_owned()
-    } else {
-        tail_chars(value, available)
-    };
+    let shown = tail_chars(value, available);
     frame.render_widget(
-        Paragraph::new(shown.as_str()).style(if disabled || read_only {
+        Paragraph::new(shown.as_str()).style(if read_only {
             Theme::muted()
         } else {
             Style::default()
@@ -1037,7 +988,7 @@ fn render_input(
         inner,
     );
     frame.render_widget(block, area);
-    if focused && !read_only && !disabled {
+    if focused && !read_only {
         let cursor = shown.chars().count().min(available) as u16;
         frame.set_cursor_position((inner.x + cursor, inner.y));
     }
@@ -1408,6 +1359,45 @@ mod tests {
                 assert!(screen.contains("Details"));
             }
         }
+    }
+
+    #[test]
+    fn tui_forms_show_and_save_optional_keys_at_minimum_size() {
+        let mut app = app();
+        let mut terminal = Terminal::new(TestBackend::new(MIN_WIDTH, MIN_HEIGHT)).unwrap();
+        app.handle_key(key(KeyCode::Char('a')));
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        let screen = terminal.backend().to_string();
+        assert!(screen.contains("Signing key (optional)"));
+        assert!(screen.contains("SSH host alias (optional)"));
+        assert!(screen.contains("SSH authentication public key (optional)"));
+
+        for value in ["work", "Ada", "ada@example.com", "", ""] {
+            for character in value.chars() {
+                app.handle_key(key(KeyCode::Char(character)));
+            }
+            app.handle_key(key(KeyCode::Tab));
+        }
+        for character in "~/.ssh/work.pub".chars() {
+            app.handle_key(key(KeyCode::Char(character)));
+        }
+        app.handle_key(key(KeyCode::Enter));
+        let profile = app.store.get("work").unwrap();
+        assert_eq!(profile.signing_key, None);
+        assert_eq!(profile.ssh_auth_key.as_deref(), Some("~/.ssh/work.pub"));
+
+        app.handle_key(key(KeyCode::Char('e')));
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        let screen = terminal.backend().to_string();
+        assert!(screen.contains("SSH host alias (optional)"));
+        assert!(screen.contains("SSH authentication public key (optional)"));
+        assert!(screen.contains("~/.ssh/work.pub"));
+        app.handle_key(key(KeyCode::BackTab));
+        for _ in "~/.ssh/work.pub".chars() {
+            app.handle_key(key(KeyCode::Backspace));
+        }
+        app.handle_key(key(KeyCode::Enter));
+        assert_eq!(app.store.get("work").unwrap().ssh_auth_key, None);
     }
 
     #[test]

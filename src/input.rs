@@ -23,10 +23,7 @@ pub fn collect_profile(
     };
     let signing_key = match signing_key {
         Some(value) => Some(value),
-        None if prompt_confirmation("Enable commit signing? [y/N]: ", reader, writer)? => {
-            Some(prompt_required("Signing key: ", reader, writer)?)
-        }
-        None => None,
+        None => prompt_optional("Signing key (leave blank to skip): ", reader, writer)?,
     };
     let ssh_host = match ssh_host {
         Some(value) => Some(value),
@@ -57,20 +54,8 @@ pub fn edit_profile(
 ) -> Result<Profile> {
     let name = prompt_with_default("Git author name", &current.name, reader, writer)?;
     let email = prompt_with_default("Git author email", &current.email, reader, writer)?;
-    let signing_enabled = prompt_confirmation_with_default(
-        "Enable commit signing?",
-        current.signing_key.is_some(),
-        reader,
-        writer,
-    )?;
-    let signing_key = if signing_enabled {
-        match current.signing_key {
-            Some(key) => Some(prompt_with_default("Signing key", &key, reader, writer)?),
-            None => Some(prompt_required("Signing key: ", reader, writer)?),
-        }
-    } else {
-        None
-    };
+    let signing_key =
+        prompt_optional_with_default("Signing key", current.signing_key, reader, writer)?;
     let ssh_host =
         prompt_optional_with_default("SSH host alias", current.ssh_host, reader, writer)?;
 
@@ -108,24 +93,6 @@ fn prompt_optional(
     Ok((!value.is_empty()).then_some(value))
 }
 
-fn prompt_confirmation(
-    prompt: &str,
-    reader: &mut impl BufRead,
-    writer: &mut impl Write,
-) -> Result<bool> {
-    loop {
-        write_prompt(prompt, writer)?;
-        let value = read_line(reader)?;
-        match value.to_ascii_lowercase().as_str() {
-            "" | "n" | "no" => return Ok(false),
-            "y" | "yes" => return Ok(true),
-            _ => {
-                writeln!(writer, "Please answer y or n.").context("could not write prompt")?;
-            }
-        }
-    }
-}
-
 fn prompt_with_default(
     label: &str,
     default: &str,
@@ -160,27 +127,6 @@ fn prompt_optional_with_default(
     } else {
         Some(value)
     })
-}
-
-fn prompt_confirmation_with_default(
-    label: &str,
-    default: bool,
-    reader: &mut impl BufRead,
-    writer: &mut impl Write,
-) -> Result<bool> {
-    let suffix = if default { "[Y/n]" } else { "[y/N]" };
-    loop {
-        write_prompt(&format!("{label} {suffix}: "), writer)?;
-        let value = read_line(reader)?;
-        match value.to_ascii_lowercase().as_str() {
-            "" => return Ok(default),
-            "n" | "no" => return Ok(false),
-            "y" | "yes" => return Ok(true),
-            _ => {
-                writeln!(writer, "Please answer y or n.").context("could not write prompt")?;
-            }
-        }
-    }
 }
 
 fn write_prompt(prompt: &str, writer: &mut impl Write) -> Result<()> {
@@ -241,55 +187,41 @@ mod tests {
         );
         assert_eq!(
             output,
-            "Git author name: Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
+            "Git author name: Git author email: Signing key (leave blank to skip): SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
         );
     }
 
     #[test]
     fn only_prompts_for_missing_required_values() {
-        let (result, output) = collect(Some("Ada"), None, None, None, "ada@example.com\nno\n\n\n");
+        let (result, output) = collect(Some("Ada"), None, None, None, "ada@example.com\n\n\n\n");
         assert_eq!(result.unwrap().email, "ada@example.com");
         assert_eq!(
             output,
-            "Git author email: Enable commit signing? [y/N]: SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
+            "Git author email: Signing key (leave blank to skip): SSH host alias (leave blank to skip): SSH authentication public key (key or .pub file path, leave blank to skip): "
         );
     }
 
     #[test]
-    fn collects_signing_key_after_confirmation() {
-        let (result, output) = collect(
-            None,
-            None,
-            None,
-            None,
-            "Ada\na@example.com\nYES\n KEY \n\n\n",
-        );
+    fn collects_optional_signing_key() {
+        let (result, output) = collect(None, None, None, None, "Ada\na@example.com\n KEY \n\n\n");
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
-        assert!(output.contains("Signing key: "));
+        assert!(output.contains("Signing key (leave blank to skip): "));
     }
 
     #[test]
-    fn retries_empty_required_and_invalid_confirmation() {
-        let (result, output) = collect(
-            None,
-            None,
-            None,
-            None,
-            "\nAda\n\na@example.com\nmaybe\ny\nKEY\n\n\n",
-        );
+    fn retries_empty_required_fields() {
+        let (result, output) = collect(None, None, None, None, "\nAda\n\na@example.com\nKEY\n\n\n");
         assert!(result.is_ok());
         assert_eq!(output.matches("Git author name: ").count(), 2);
         assert_eq!(output.matches("Git author email: ").count(), 2);
-        assert_eq!(output.matches("Enable commit signing? [y/N]: ").count(), 2);
         assert!(output.contains("Value must not be empty."));
-        assert!(output.contains("Please answer y or n."));
     }
 
     #[test]
-    fn provided_signing_key_skips_confirmation() {
+    fn provided_signing_key_skips_prompt() {
         let (result, output) = collect(None, None, Some("KEY"), None, "Ada\na@example.com\n\n\n");
         assert_eq!(result.unwrap().signing_key.as_deref(), Some("KEY"));
-        assert!(!output.contains("Enable commit signing?"));
+        assert!(!output.contains("Signing key"));
     }
 
     #[test]
@@ -322,15 +254,14 @@ mod tests {
             ssh_host: None,
             ssh_auth_key: None,
         };
-        let mut reader = Cursor::new(b"\n\n\n\n\n");
+        let mut reader = Cursor::new(b"\n\n\n\n");
         let mut output = Vec::new();
         let edited = edit_profile(current.clone(), &mut reader, &mut output).unwrap();
 
         assert_eq!(edited, current);
         let output = String::from_utf8(output).unwrap();
         assert!(output.contains("Git author name [Ada]: "));
-        assert!(output.contains("Enable commit signing? [Y/n]: "));
-        assert!(output.contains("Signing key [KEY]: "));
+        assert!(output.contains("Signing key [KEY; blank keeps, - clears]: "));
     }
 
     #[test]
@@ -342,7 +273,7 @@ mod tests {
             ssh_host: None,
             ssh_auth_key: None,
         };
-        let mut reader = Cursor::new(b"New\nnew@example.com\nno\n\n");
+        let mut reader = Cursor::new(b"New\nnew@example.com\n-\n\n");
         let mut output = Vec::new();
         let edited = edit_profile(current, &mut reader, &mut output).unwrap();
 

@@ -422,7 +422,7 @@ fn hex_signing_key_uses_openpgp_format() {
 #[test]
 fn use_rewrites_all_ssh_remote_urls() {
     let context = TestContext::new(true);
-    context.ssh_config("Host github-work\n  HostName github.com\n");
+    context.ssh_config("Host github-work github-personal\n  HostName github.com\n");
     context.git(&[
         "remote",
         "add",
@@ -476,6 +476,51 @@ fn use_rewrites_all_ssh_remote_urls() {
     assert_eq!(
         context.git_values("remote.upstream.url"),
         vec!["https://github.com/upstream/project.git"]
+    );
+    assert_success(&context.g(&["use", "work"]));
+    assert_success(&context.g(&["edit", "work", "--ssh-host", "github-personal"]));
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_values("remote.origin.url"),
+        vec!["git@github-personal:owner/project.git"]
+    );
+    assert_success(&context.g(&["edit", "work", "--no-ssh-host"]));
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_values("remote.origin.url"),
+        vec!["git@github.com:owner/project.git"]
+    );
+    assert_eq!(
+        context.git_values("remote.origin.pushurl"),
+        vec![
+            "ssh://git@gitlab.com:2222/group/project.git",
+            "git@github.com:owner/project-push.git"
+        ]
+    );
+    assert!(
+        context
+            .git_values("remote.origin.g-original-url")
+            .is_empty()
+    );
+    assert!(
+        context
+            .git_values("remote.origin.g-applied-pushurl")
+            .is_empty()
+    );
+
+    assert_success(&context.g(&["edit", "work", "--ssh-host", "github-work"]));
+    assert_success(&context.g(&["use", "work"]));
+    context.git(&[
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:new/project.git",
+    ]);
+    assert_success(&context.g(&["edit", "work", "--no-ssh-host"]));
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_values("remote.origin.url"),
+        vec!["git@github.com:new/project.git"]
     );
 }
 

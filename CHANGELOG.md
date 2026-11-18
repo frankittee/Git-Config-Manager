@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Unreleased
 
+- Restore saved remote URLs when applying a profile without an SSH host alias.
+- Configure commit signing through a single optional signing key field in interactive forms.
+
 - Add per-profile SSH authentication public keys for repository push and fetch, with support for inline OpenSSH public keys and file paths.
 
 ## [v1.3.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.2.0..v1.3.0) - 2026-11-16

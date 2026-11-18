@@ -6,16 +6,15 @@
 use std::io;
 
 use anyhow::{Context, Result, bail};
-use demand::{Confirm, Input};
+use demand::Input;
 
 use crate::profiles::Profile;
 
 // Aliases listed in the SSH host description before collapsing into "+N more".
 const MAX_LISTED_ALIASES: usize = 4;
 
-/// Asks for every profile field, prefilled from `initial`. `signing` sets the
-/// default answer of the commit-signing confirmation.
-pub fn run(initial: Profile, signing: bool, aliases: Vec<String>) -> Result<Profile> {
+/// Asks for identity fields, prefilled from `initial`.
+pub fn run(initial: Profile, aliases: Vec<String>) -> Result<Profile> {
     let aliases = suggestible_aliases(aliases);
 
     let name = ask(Input::new("Git author name")
@@ -26,23 +25,10 @@ pub fn run(initial: Profile, signing: bool, aliases: Vec<String>) -> Result<Prof
         .placeholder("ada@example.com")
         .default_value(initial.email)
         .validation(required))?;
-    let signing = cancellable(
-        Confirm::new("Enable commit signing?")
-            .description("Sign commits with an SSH key")
-            .affirmative("Yes")
-            .negative("No")
-            .selected(signing)
-            .run(),
-    )?;
-    let signing_key = if signing {
-        Some(ask(Input::new("Signing key")
-            .description("SSH public key path or literal key")
-            .placeholder("~/.ssh/id_ed25519.pub")
-            .default_value(initial.signing_key.unwrap_or_default())
-            .validation(required))?)
-    } else {
-        None
-    };
+    let signing_key = ask(Input::new("Signing key")
+        .description("OpenPGP key ID or SSH key. Leave blank to skip signing.")
+        .placeholder("~/.ssh/id_ed25519.pub")
+        .default_value(initial.signing_key.unwrap_or_default()))?;
     let description = ssh_host_description(&aliases);
     let suggestions = aliases.clone();
     let ssh_host = ask(Input::new("SSH host alias")
@@ -55,7 +41,7 @@ pub fn run(initial: Profile, signing: bool, aliases: Vec<String>) -> Result<Prof
     Ok(Profile {
         name,
         email,
-        signing_key,
+        signing_key: (!signing_key.is_empty()).then_some(signing_key),
         ssh_host: (!ssh_host.is_empty()).then_some(ssh_host),
         ssh_auth_key: initial.ssh_auth_key,
     })

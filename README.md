@@ -62,7 +62,6 @@ Create a profile. In a terminal, `g add` asks for each field in turn with inline
 $ g add work
 Git author name Ada Lovelace
 Git author email ada@company.example
-Enable commit signing? Yes
 Signing key ~/.ssh/id_ed25519.pub
 SSH host alias
 Leave blank to skip · tab completes: github-personal, github-work
@@ -70,7 +69,7 @@ Leave blank to skip · tab completes: github-personal, github-work
  → github-work
 ```
 
-Keys: `enter` validates and submits the current field (empty required fields show an inline error), `←`/`→` toggle the signing confirmation and `y`/`n` answer it directly, `tab` completes the highlighted SSH host alias from `~/.ssh/config` (`↑`/`↓` move through the suggestions), `ctrl+u` clears a field, and `esc` or `ctrl+c` cancels with `error: cancelled` without changing anything. The signing key is only asked for when signing is enabled. Flags such as `--name` prefill the prompts. After the last field a success line is printed:
+Press `enter` to submit the current field. Leave `Signing key` blank to skip commit signing. Press `tab` to complete the highlighted SSH host alias from `~/.ssh/config` and `↑` or `↓` to move through suggestions. Use `ctrl+u` to clear a field or `esc` or `ctrl+c` to cancel. Flags such as `--name` prefill the prompts. After the last field a success line is printed:
 
 ```text
 ✓ Saved profile `work`
@@ -212,9 +211,13 @@ If a profile has a signing key, `g use` sets `user.signingkey`, enables `commit.
 
 If a profile has an `ssh_host`, `g` first verifies that the literal `Host` alias exists in `~/.ssh/config` or an included configuration file, then rewrites SSH fetch URLs and explicit push URLs for every remote to use that alias. Include paths support paths relative to `~/.ssh`, absolute paths, `~`, nested includes, and glob wildcards. HTTPS and local URLs are left unchanged. Validation or write failures leave both identity and remote configuration unchanged.
 
+`g use` saves the original URLs in the repository's Git configuration when it rewrites them. Clear the alias with `g edit work --no-ssh-host` and run `g use work` to restore the saved URLs. A URL list edited manually since the last rewrite keeps its current values when the alias is cleared. Repositories rewritten before URL backups were introduced need a one-time manual correction if the original address is already missing.
+
 ### SSH authentication keys for multiple GitHub accounts
 
 `g add work` prompts for an optional SSH authentication public key. Paste the public key, enter a `.pub` file path, or press Enter to skip.
+
+In the TUI, press `a` to add a profile or `e` to edit the selected one. Use `Tab` to reach **SSH authentication public key**, enter the key or path, and press `Enter` to save. Both key fields accept an empty value.
 
 Load the matching private key into `ssh-agent`, add the public key to the corresponding GitHub account, and use an SSH remote such as `git@github.com:owner/repo.git`.
 

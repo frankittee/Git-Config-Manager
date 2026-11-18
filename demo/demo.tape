@@ -39,10 +39,6 @@ Type "ada@company.example"
 Sleep 300ms
 Enter
 Sleep 700ms
-Left
-Sleep 700ms
-Enter
-Sleep 500ms
 Type "~/.ssh/id_ed25519.pub"
 Sleep 300ms
 Enter

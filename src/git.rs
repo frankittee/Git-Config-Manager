@@ -391,9 +391,6 @@ fn ssh_config_path() -> Result<PathBuf> {
 }
 
 fn remote_updates(scope: ConfigScope, ssh_host: Option<&str>) -> Result<Vec<RemoteUpdate>> {
-    let Some(ssh_host) = ssh_host else {
-        return Ok(Vec::new());
-    };
     if matches!(scope, ConfigScope::Global) {
         return Ok(Vec::new());
     }
@@ -406,16 +403,36 @@ fn remote_updates(scope: ConfigScope, ssh_host: Option<&str>) -> Result<Vec<Remo
     for name in names.lines() {
         for suffix in ["url", "pushurl"] {
             let key = format!("remote.{name}.{suffix}");
+            let backup_key = format!("remote.{name}.g-original-{suffix}");
+            let applied_key = format!("remote.{name}.g-applied-{suffix}");
+            let backup = get_all(scope, &backup_key)?;
+            let applied = get_all(scope, &applied_key)?;
             let values = get_all(scope, &key)?;
-            let rewritten: Vec<String> = values
-                .iter()
-                .map(|url| rewrite_ssh_url(url, ssh_host).unwrap_or_else(|| url.clone()))
-                .collect();
-            if values != rewritten {
-                updates.push(RemoteUpdate {
-                    key,
-                    values: rewritten,
-                });
+            let original = if !backup.is_empty() && applied == values {
+                &backup
+            } else {
+                &values
+            };
+            let rewritten: Vec<String> = match ssh_host {
+                Some(host) => original
+                    .iter()
+                    .map(|url| rewrite_ssh_url(url, host).unwrap_or_else(|| url.clone()))
+                    .collect(),
+                None => original.clone(),
+            };
+            let (next_backup, next_applied) = if *original == rewritten {
+                (Vec::new(), Vec::new())
+            } else {
+                (original.clone(), rewritten.clone())
+            };
+            for (key, current, next) in [
+                (key, values, rewritten),
+                (backup_key, backup, next_backup),
+                (applied_key, applied, next_applied),
+            ] {
+                if current != next {
+                    updates.push(RemoteUpdate { key, values: next });
+                }
             }
         }
     }

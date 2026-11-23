@@ -199,7 +199,7 @@ Bash, Zsh, Fish, Elvish, Nushell, and PowerShell are supported.
 Profiles are stored in:
 
 ```text
-$HOME/.config/git-config-switch/config.toml
+$HOME/.config/git-config-manager/config.toml
 ```
 
 Set `G_CONFIG_DIR` to override the containing directory, for example in isolated automation or tests.

@@ -16,7 +16,7 @@ This repository contains the Rust CLI binary `g`.
 - `.github/workflows/release.yml` builds tagged releases for Linux musl and macOS targets.
 - `hk.pkl` configures Git hooks; `cliff.toml` configures git-cliff changelog generation; `scripts/release.sh` (run via `mise run release`) creates release commits and tags.
 
-Profiles default to `$HOME/.config/git-config-switch/config.toml`. Tests must set `G_CONFIG_DIR` and must not modify a developer's real configuration.
+Profiles default to `$HOME/.config/git-config-manager/config.toml`. Tests must set `G_CONFIG_DIR` and must not modify a developer's real configuration.
 
 ## Build, Test, and Development Commands
 

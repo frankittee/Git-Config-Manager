@@ -187,7 +187,7 @@ impl ProfileStore {
 
 fn default_path(home: &Path) -> PathBuf {
     home.join(".config")
-        .join("git-config-switch")
+        .join("git-config-manager")
         .join("config.toml")
 }
 
@@ -288,7 +288,7 @@ mod tests {
     fn default_path_is_under_home_config_directory() {
         assert_eq!(
             default_path(Path::new("/home/example")),
-            PathBuf::from("/home/example/.config/git-config-switch/config.toml")
+            PathBuf::from("/home/example/.config/git-config-manager/config.toml")
         );
     }
 

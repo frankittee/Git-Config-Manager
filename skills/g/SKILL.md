@@ -5,12 +5,12 @@ description: Manage multiple Git identities with the g CLI. Use when a user want
 
 # g
 
-Use `g` rather than editing `~/.config/git-config-switch/config.toml` or running `git config user.*` by hand.
+Use `g` rather than editing `~/.config/git-config-manager/config.toml` or running `git config user.*` by hand.
 
 ## Safety and scope
 
 - Profile data is personal. Do not echo emails or signing keys unnecessarily, and do not paste `g show` or `g export` output into commits, issues, or logs.
-- `g add`, `edit`, `remove`, and `import` modify the profile store (`$HOME/.config/git-config-switch/config.toml`, or `$G_CONFIG_DIR/config.toml`). Confirm with the user before removing or overwriting (`import --force`) a profile.
+- `g add`, `edit`, `remove`, and `import` modify the profile store (`$HOME/.config/git-config-manager/config.toml`, or `$G_CONFIG_DIR/config.toml`). Confirm with the user before removing or overwriting (`import --force`) a profile.
 - `g use` and `g unuse` change Git configuration. In a repository they change only that repository's local config. When run from the user's home directory they change the global Git config instead, so check `pwd` first and never run them from `$HOME` unless a global change is intended.
 - Before changing a repository, identify the target with `git rev-parse --show-toplevel`, or pass it explicitly with `g -C /path/to/repo ...` (the option goes before the subcommand).
 - Local scope requires a Git repository; `add`, `edit`, `list`, `show`, `export`, and `import` work from any directory.
@@ -64,7 +64,6 @@ g unuse
 - `g doctor` checks every saved profile for a missing SSH signing key file, an undeclared `ssh_host` alias, and an unset `gpg.ssh.allowedSignersFile` (warning only). It exits 1 when any error is found.
 - `g unuse` restores the five managed identity keys from the `[g]` backup in the current scope and prints which file changed, or says nothing needed removing. It also restores managed fetch and push URL lists that still match the last rewrite, preserves manually changed lists, and clears the remote backup records.
 - Writes are rolled back automatically if any step fails.
-
 - In a repository, `g use` with an inline SSH signing public key adds the profile email and key to the managed `.git/ssh/g-allowed-signers` file and sets `gpg.ssh.allowedSignersFile` locally. It uses a relative path in ordinary repositories and an absolute path with linked worktrees or separate Git directories. `g unuse` clears the managed setting recorded in `[g]`, preserves the signer history on disk, and respects custom configuration.
 
 ## Import and export

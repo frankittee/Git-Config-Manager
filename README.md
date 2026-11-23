@@ -178,7 +178,7 @@ Exported files contain your email address and signing key, so keep them private.
 
 ## Shell completion
 
-Add the matching line to your shell configuration after `g` is on your `PATH`. Open a new shell, then press Tab after `g use ` to list saved profile names or after a partial name to complete it.
+Add the matching line to your shell configuration after `g` is on your `PATH`. Open a new shell, then type `g use` followed by a space and press Tab to list saved profile names or after a partial name to complete it.
 
 | Shell | Configuration file | Line to add |
 | --- | --- | --- |

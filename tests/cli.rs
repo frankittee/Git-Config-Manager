@@ -308,10 +308,6 @@ fn switches_ssh_auth_keys_and_restores_the_previous_command() {
         assert_success(&context.g(&["edit", profile, "--ssh-auth-key", &ssh_auth_key]));
         assert_success(&context.g(&["use", profile]));
         assert_eq!(fs::read_to_string(&installed).unwrap(), expected);
-        assert_eq!(
-            context.git_value("g.managedSshAuthKeyFile").as_deref(),
-            Some("ssh/g-auth.pub")
-        );
         let command = context.git_value("core.sshCommand").unwrap();
         let config = Command::new("sh")
             .args(["-c", &format!("{command} -G git@github.com")])
@@ -346,7 +342,6 @@ fn switches_ssh_auth_keys_and_restores_the_previous_command() {
         Some(previous)
     );
     assert!(!installed.exists());
-    assert_eq!(context.git_value("g.managedSshAuthKeyFile"), None);
     assert_success(&context.g(&["use", "work"]));
     assert_success(&context.g(&["unuse"]));
     assert_eq!(
@@ -354,7 +349,6 @@ fn switches_ssh_auth_keys_and_restores_the_previous_command() {
         Some(previous)
     );
     assert!(!installed.exists());
-    assert_eq!(context.git_value("g.managedSshAuthKeyFile"), None);
 }
 
 #[test]

@@ -6,6 +6,7 @@ use usage::{Cli as CliParser, Subcommands, ValueEnum};
 
 use crate::profiles::ProfileStore;
 
+// usage-derive passes its generated, unnameable partial struct first; profile names don't need it.
 fn profile_names(_partial: &impl Sized, ctx: &CompleteCtx<'_>) -> Vec<Candidate<'static>> {
     // Supply the unfinished profile argument so the normal parser can resolve -C.
     let mut args: Vec<&OsStr> = ctx.words[..ctx.cword].iter().map(OsStr::new).collect();
@@ -155,16 +156,15 @@ pub enum Shell {
 
 impl Shell {
     pub(crate) fn completion_script(self) -> String {
-        let fish = matches!(self, Self::Fish);
         let script = Cli::completion_script(self.into());
-        if fish {
-            // Fish also matches `complete -c g` when the command is invoked by path.
-            script.replace(
+        match self {
+            // Fish also matches `complete -c g` when the command is invoked by path, so call the
+            // binary that was typed. `-o` (not fish 4's `-x`) keeps fish 3 working.
+            Self::Fish => script.replace(
                 "    set -l out (command 'g' __complete_word__",
                 "    set -l words (commandline -opc)\n    set -l out (command $words[1] __complete_word__",
-            )
-        } else {
-            script
+            ),
+            _ => script,
         }
     }
 }
@@ -179,5 +179,18 @@ impl From<Shell> for usage::complete::Shell {
             Shell::Pwsh => Self::PowerShell,
             Shell::Zsh => Self::Zsh,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fish_completion_calls_the_typed_binary() {
+        // Guards the string patch against changes in usage-rs's generated script.
+        let script = Shell::Fish.completion_script();
+        assert!(script.contains("(command $words[1] __complete_word__"));
+        assert!(!script.contains("(command 'g' __complete_word__"));
     }
 }

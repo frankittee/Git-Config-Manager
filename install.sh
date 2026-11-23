@@ -84,9 +84,16 @@ mkdir -p "$install_dir"
 install -m 755 "${tmp_dir}/g" "${install_dir}/g"
 
 echo "Installed g to ${install_dir}/g"
+
 case ":${PATH}:" in
     *":${install_dir}:"*) ;;
     *)
         echo "Add ${install_dir} to PATH to run g."
         ;;
 esac
+
+printf '\nTo enable shell completion, add the matching line to your shell configuration:\n'
+printf '%s\n' \
+    '  Bash (~/.bashrc): eval "$(g completion bash)"' \
+    '  Zsh (~/.zshrc, after compinit): eval "$(g completion zsh)"' \
+    '  fish (~/.config/fish/config.fish): g completion fish | source'

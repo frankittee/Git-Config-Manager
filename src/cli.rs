@@ -1,6 +1,26 @@
-use std::path::PathBuf;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 
+use usage::complete::{Candidate, CompleteCtx};
 use usage::{Cli as CliParser, Subcommands, ValueEnum};
+
+use crate::profiles::ProfileStore;
+
+fn profile_names(_partial: &impl Sized, ctx: &CompleteCtx<'_>) -> Vec<Candidate<'static>> {
+    // Supply the unfinished profile argument so the normal parser can resolve -C.
+    let mut args: Vec<&OsStr> = ctx.words[..ctx.cword].iter().map(OsStr::new).collect();
+    args.push(OsStr::new("profile"));
+    let Ok(cli) = Cli::parse_from_argv(&args) else {
+        return Vec::new();
+    };
+    let directory = cli.directory.as_deref().unwrap_or(Path::new("."));
+    ProfileStore::from_environment_in(directory)
+        .and_then(|store| store.list())
+        .unwrap_or_default()
+        .into_iter()
+        .map(Candidate::new)
+        .collect()
+}
 
 #[derive(Debug, CliParser)]
 #[usage(
@@ -86,6 +106,7 @@ pub enum Command {
     /// Apply a profile to the current Git repository
     Use {
         /// Saved profile name
+        #[usage(complete = profile_names)]
         profile: String,
     },
     /// Remove the identity applied by g from the current Git configuration
@@ -130,6 +151,22 @@ pub enum Shell {
     #[usage(name = "powershell")]
     Pwsh,
     Zsh,
+}
+
+impl Shell {
+    pub(crate) fn completion_script(self) -> String {
+        let fish = matches!(self, Self::Fish);
+        let script = Cli::completion_script(self.into());
+        if fish {
+            // Fish also matches `complete -c g` when the command is invoked by path.
+            script.replace(
+                "    set -l out (command 'g' __complete_word__",
+                "    set -l words (commandline -opc)\n    set -l out (command $words[1] __complete_word__",
+            )
+        } else {
+            script
+        }
+    }
 }
 
 impl From<Shell> for usage::complete::Shell {

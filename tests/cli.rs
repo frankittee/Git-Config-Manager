@@ -175,6 +175,24 @@ fn bare_command_requires_a_terminal() {
 }
 
 #[test]
+fn use_completes_saved_profile_names() {
+    let context = TestContext::new(false);
+    add(&context, "personal", "Personal", "personal@example.com");
+    add(&context, "work", "Work", "work@example.com");
+
+    for (line, expected) in [
+        ("g use ", "personal\nwork\n"),
+        ("g use wo", "work\n"),
+        ("g -C . use wo", "work\n"),
+        ("./target/release/g use wo", "work\n"),
+    ] {
+        let output = context.g(&["__complete_word__", "--shell", "fish", "--line", line]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(stdout(&output), expected);
+    }
+}
+
+#[test]
 fn profile_management_round_trip() {
     let context = TestContext::new(true);
     add(&context, "work", "Work User", "work@example.com");

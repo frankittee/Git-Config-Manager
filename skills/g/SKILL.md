@@ -80,4 +80,4 @@ The format is plain TOML with `name`, `email`, and optional `signing_key`, `ssh_
 
 ## Completion
 
-`g completion <bash|zsh|fish|elvish|nu|powershell>` prints a completion script. Only install one if the user asks.
+`g completion <bash|zsh|fish|elvish|nu|powershell>` prints a completion script. With shell completion enabled, `g use <Tab>` suggests saved profile names. Only install one if the user asks.

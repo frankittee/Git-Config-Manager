@@ -198,7 +198,7 @@ fn run() -> Result<()> {
             println!("{profile}");
         }
         Some(cli::Command::Completion { shell }) => {
-            print!("{}", cli::Cli::completion_script(shell.into()));
+            print!("{}", shell.completion_script());
         }
         Some(cli::Command::Info { short: true }) => {
             // Shell prompts call this on every redraw, so it must never fail loudly.

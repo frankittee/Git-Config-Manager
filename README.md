@@ -40,7 +40,7 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/frankittee/Git-Config-Manager/main/install.sh | sh
 ```
 
-The installer verifies the release checksum and places `g` in `~/.local/bin`.
+The installer verifies the release checksum and places `g` in `~/.local/bin`. It prints the [shell completion setup](#shell-completion) commands after installation.
 
 ```sh
 # Choose a different installation directory
@@ -178,16 +178,15 @@ Exported files contain your email address and signing key, so keep them private.
 
 ## Shell completion
 
-```sh
-# fish
-g completion fish > ~/.config/fish/completions/g.fish
+Add the matching line to your shell configuration after `g` is on your `PATH`. Open a new shell, then press Tab after `g use ` to list saved profile names or after a partial name to complete it.
 
-# bash
-g completion bash > ~/.local/share/bash-completion/completions/g
+| Shell | Configuration file | Line to add |
+| --- | --- | --- |
+| Bash | `~/.bashrc` | `eval "$(g completion bash)"` |
+| Zsh | `~/.zshrc`, after `compinit` | `eval "$(g completion zsh)"` |
+| Fish | `~/.config/fish/config.fish` | `g completion fish \| source` |
 
-# zsh (write to a directory on your $fpath)
-g completion zsh > ~/.zfunc/_g
-```
+If Zsh has no `compinit` call, add `autoload -Uz compinit` and `compinit` on separate lines before loading the `g` completion script.
 
 Bash, Zsh, Fish, Elvish, Nushell, and PowerShell are supported.
 

@@ -57,6 +57,10 @@ pub struct ProfileStore {
 
 impl ProfileStore {
     pub fn from_environment() -> Result<Self> {
+        Self::from_environment_in(Path::new("."))
+    }
+
+    pub fn from_environment_in(working_directory: &Path) -> Result<Self> {
         let directory = match env::var_os("G_CONFIG_DIR") {
             Some(path) => PathBuf::from(path),
             None => {
@@ -65,7 +69,9 @@ impl ProfileStore {
                 return Ok(Self::new(default_path(base.home_dir())));
             }
         };
-        Ok(Self::new(directory.join("config.toml")))
+        Ok(Self::new(
+            working_directory.join(directory).join("config.toml"),
+        ))
     }
 
     pub fn new(path: PathBuf) -> Self {

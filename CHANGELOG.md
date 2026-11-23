@@ -4,17 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-- Back up identity and signing settings on the first `g use` and restore them on `g unuse`.
-
-- Store remote URL backups in `[g]` and restore them on `g unuse` or when applying a profile without an SSH host alias.
-- Configure commit signing through a single optional signing key field in interactive forms.
-
-- Add per-profile SSH authentication public keys for repository push and fetch, with support for inline OpenSSH public keys and file paths.
-- Remove the managed SSH authentication public key when restoring the previous SSH command.
-- Set up repository-local SSH signature verification when applying a profile with an inline signing public key, using a portable path for ordinary repositories and clearing the managed setting on `g unuse`.
-
 ## [v1.4.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.3.0..v1.4.0) - 2026-11-18
 
 #### Features

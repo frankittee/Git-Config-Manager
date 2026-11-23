@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.5.0..v2.0.0) - 2026-11-23
+
+#### Bug Fixes
+- [**breaking**] Rename the default profile directory - ([80378e7](https://github.com/frankittee/Git-Config-Manager/commit/80378e77895c78ea0e5f4727bb221d1888537490)) - frankittee
+
 ## [v1.5.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.4.0..v1.5.0) - 2026-11-23
 
 #### Features

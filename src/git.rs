@@ -1,6 +1,8 @@
 use std::{
     collections::BTreeSet,
-    env, fs,
+    env,
+    fmt::Write as _,
+    fs,
     io::Write,
     path::PathBuf,
     process::{Command, Output},
@@ -13,16 +15,22 @@ use tempfile::NamedTempFile;
 
 use crate::profiles::Profile;
 
-const IDENTITY_KEYS: [&str; 5] = [
-    "user.name",
-    "user.email",
-    "user.signingkey",
-    "commit.gpgsign",
-    "gpg.format",
+const IDENTITY_KEYS: [(&str, &str); 5] = [
+    ("user.name", "g.previousUserName"),
+    ("user.email", "g.previousUserEmail"),
+    ("user.signingkey", "g.previousSigningKey"),
+    ("commit.gpgsign", "g.previousCommitGpgSign"),
+    ("gpg.format", "g.previousGpgFormat"),
 ];
+const MANAGED_IDENTITY: &str = "g.identityManaged";
 const SSH_COMMAND: &str = "core.sshCommand";
+const ALLOWED_SIGNERS: &str = "gpg.ssh.allowedSignersFile";
+const MANAGED_SIGNERS: &str = "g.managedAllowedSignersFile";
+const SSH_KEY_PREFIXES: [&str; 3] = ["ssh-", "ecdsa-", "sk-"];
 const SSH_MANAGED: &str = "g.sshAuthKeyManaged";
 const SSH_PREVIOUS: &str = "g.previousSshCommand";
+const MANAGED_AUTH_KEY: &str = "g.managedSshAuthKeyFile";
+const AUTH_KEY_FILE: &str = "g-auth.pub";
 
 #[derive(Clone, Copy)]
 enum ConfigScope {
@@ -54,7 +62,8 @@ impl GitIdentity {
             && self.email.as_deref() == Some(profile.email.as_str())
             && match &profile.signing_key {
                 Some(key) => {
-                    self.signing_key.as_deref() == Some(key.as_str())
+                    self.signing_key.as_deref().map(signing_config_value)
+                        == Some(signing_config_value(key))
                         && self
                             .gpg_sign
                             .as_deref()
@@ -118,7 +127,7 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
     }
 
     let remote_updates = remote_updates(scope, profile.ssh_host.as_deref())?;
-    let mut keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    let mut keys = identity_config_keys();
     keys.extend(remote_updates.iter().map(|update| update.key.clone()));
     let managed = matches!(scope, ConfigScope::Local) && ssh_auth_key_managed(scope)?;
     let ssh_auth_key = match &profile.ssh_auth_key {
@@ -129,13 +138,26 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
         None => None,
     };
     if managed || ssh_auth_key.is_some() {
-        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS].map(str::to_owned));
+        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS, MANAGED_AUTH_KEY].map(str::to_owned));
     }
+    let allowed_signers = if matches!(scope, ConfigScope::Local) {
+        prepare_allowed_signers(profile)?
+    } else {
+        None
+    };
+    if allowed_signers.is_some() {
+        keys.extend([ALLOWED_SIGNERS, MANAGED_SIGNERS].map(str::to_owned));
+    }
+    let remove_auth_key = managed && ssh_auth_key.is_none();
     let original = snapshot(scope, &keys)?;
-    let result = apply(scope, profile);
+    let result = save_identity(scope).and_then(|()| apply(scope, profile));
     let result = result.and_then(|()| apply_remote_updates(scope, &remote_updates));
     let result = result.and_then(|()| {
         let origin = config_origin(scope, "user.name")?;
+        if let Some((_, _, value)) = &allowed_signers {
+            replace(scope, ALLOWED_SIGNERS, value)?;
+            replace(scope, MANAGED_SIGNERS, value)?;
+        }
         if let Some((key, path, command)) = ssh_auth_key {
             if !managed {
                 for value in get_all(scope, SSH_COMMAND)? {
@@ -144,10 +166,19 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
                 replace(scope, SSH_MANAGED, "true")?;
             }
             replace(scope, SSH_COMMAND, &command)?;
+            replace(scope, MANAGED_AUTH_KEY, "ssh/g-auth.pub")?;
             key.persist(&path)
                 .with_context(|| format!("could not install public key at {}", path.display()))?;
         } else if managed {
             restore_ssh_command(scope)?;
+        }
+        if let Some((file, path, _)) = allowed_signers {
+            file.persist(&path).with_context(|| {
+                format!("could not install allowed signers at {}", path.display())
+            })?;
+        }
+        if remove_auth_key {
+            remove_ssh_auth_key()?;
         }
         Ok(origin)
     });
@@ -160,7 +191,7 @@ pub fn apply_profile(profile: &Profile) -> Result<String> {
     result
 }
 
-/// Remove the identity keys and SSH command that `apply_profile` manages.
+/// Restore the identity keys and SSH command that `apply_profile` manages.
 /// Returns the config file that was changed, or `None` when nothing was set.
 pub fn remove_identity() -> Result<Option<String>> {
     let scope = config_scope()?;
@@ -168,10 +199,25 @@ pub fn remove_identity() -> Result<Option<String>> {
         ensure_repository()?;
     }
     let managed = matches!(scope, ConfigScope::Local) && ssh_auth_key_managed(scope)?;
-    let mut keys: Vec<String> = IDENTITY_KEYS.iter().map(|key| (*key).to_owned()).collect();
+    let identity_managed = get_first(scope, MANAGED_IDENTITY)?.as_deref() == Some("true");
+    let mut keys = if identity_managed {
+        identity_config_keys()
+    } else {
+        Vec::new()
+    };
     if managed {
-        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS].map(str::to_owned));
+        keys.extend([SSH_COMMAND, SSH_MANAGED, SSH_PREVIOUS, MANAGED_AUTH_KEY].map(str::to_owned));
     }
+    let managed_signers = if matches!(scope, ConfigScope::Local) {
+        get_all(scope, MANAGED_SIGNERS)?.pop()
+    } else {
+        None
+    };
+    if managed_signers.is_some() {
+        keys.extend([ALLOWED_SIGNERS, MANAGED_SIGNERS].map(str::to_owned));
+    }
+    let remote_updates = remote_updates(scope, None)?;
+    keys.extend(remote_updates.iter().map(|update| update.key.clone()));
     let original = snapshot(scope, &keys)?;
     let Some(origin_key) = original
         .iter()
@@ -181,15 +227,29 @@ pub fn remove_identity() -> Result<Option<String>> {
         return Ok(None);
     };
     let config_file = config_origin(scope, &origin_key)?;
-    let result = IDENTITY_KEYS
-        .iter()
-        .try_for_each(|key| unset(scope, key))
-        .and_then(|()| {
-            if managed {
-                restore_ssh_command(scope)?;
+    let result: Result<()> = (|| {
+        if identity_managed {
+            for (key, backup) in IDENTITY_KEYS {
+                restore(scope, &[(key.to_owned(), get_all(scope, backup)?)])?;
+                unset(scope, backup)?;
             }
-            Ok(())
-        });
+            unset(scope, MANAGED_IDENTITY)?;
+        }
+        if managed {
+            restore_ssh_command(scope)?;
+        }
+        if let Some(value) = managed_signers {
+            if get_all(scope, ALLOWED_SIGNERS)? == [value] {
+                unset(scope, ALLOWED_SIGNERS)?;
+            }
+            unset(scope, MANAGED_SIGNERS)?;
+        }
+        apply_remote_updates(scope, &remote_updates)?;
+        if managed {
+            remove_ssh_auth_key()?;
+        }
+        Ok(())
+    })();
     if let Err(error) = result {
         if let Err(rollback_error) = restore(scope, &original) {
             return Err(error.context(format!("rollback also failed: {rollback_error:#}")));
@@ -197,6 +257,25 @@ pub fn remove_identity() -> Result<Option<String>> {
         return Err(error.context("Git configuration was restored"));
     }
     Ok(Some(config_file))
+}
+
+fn identity_config_keys() -> Vec<String> {
+    IDENTITY_KEYS
+        .into_iter()
+        .flat_map(|(key, backup)| [key, backup])
+        .chain([MANAGED_IDENTITY])
+        .map(str::to_owned)
+        .collect()
+}
+
+fn save_identity(scope: ConfigScope) -> Result<()> {
+    if get_first(scope, MANAGED_IDENTITY)?.as_deref() == Some("true") {
+        return Ok(());
+    }
+    for (key, backup) in IDENTITY_KEYS {
+        restore(scope, &[(backup.to_owned(), get_all(scope, key)?)])?;
+    }
+    replace(scope, MANAGED_IDENTITY, "true")
 }
 
 fn ssh_auth_key_managed(scope: ConfigScope) -> Result<bool> {
@@ -209,14 +288,25 @@ fn restore_ssh_command(scope: ConfigScope) -> Result<()> {
     let previous = get_all(scope, SSH_PREVIOUS)?;
     restore(scope, &[(SSH_COMMAND.to_owned(), previous)])?;
     unset(scope, SSH_PREVIOUS)?;
-    unset(scope, SSH_MANAGED)
+    unset(scope, SSH_MANAGED)?;
+    unset(scope, MANAGED_AUTH_KEY)
+}
+
+fn remove_ssh_auth_key() -> Result<()> {
+    // Resolve only the fixed managed path, including for repositories configured by older versions.
+    let path = repository_ssh_dir()?.join(AUTH_KEY_FILE);
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).with_context(|| format!("could not remove {}", path.display())),
+    }
 }
 
 fn prepare_ssh_auth_key(
     source: &str,
     use_ssh_config: bool,
 ) -> Result<(NamedTempFile, PathBuf, String)> {
-    let key_prefixes = ["ssh-", "ecdsa-", "sk-"];
+    let key_prefixes = SSH_KEY_PREFIXES;
     let (contents, label) = if source
         .trim()
         .split_once(char::is_whitespace)
@@ -246,26 +336,13 @@ fn prepare_ssh_auth_key(
         bail!("{label} is not an OpenSSH public key");
     }
 
-    let output = run_git(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
-    if !output.status.success() {
-        return Err(git_failure("locate", "git-common-dir", &output));
-    }
-    let git_dir = String::from_utf8(output.stdout).context("Git returned a non-UTF-8 directory")?;
-    let directory = PathBuf::from(git_dir.trim_end_matches('\n')).join("ssh");
+    let directory = repository_ssh_dir()?;
     fs::create_dir_all(&directory)
         .with_context(|| format!("could not create {}", directory.display()))?;
     let mut key = NamedTempFile::new_in(&directory).context("could not stage SSH public key")?;
     writeln!(key, "{}", contents.trim()).context("could not write SSH public key")?;
-    let status = Command::new("ssh-keygen")
-        .args(["-lf", "-"])
-        .stdin(key.reopen().context("could not reopen SSH public key")?)
-        .output()
-        .context("could not run ssh-keygen to validate the SSH public key")?
-        .status;
-    if !status.success() {
-        bail!("{label} is not a valid OpenSSH public key");
-    }
-    let path = directory.join("g-auth.pub");
+    validate_ssh_public_key(&key, &label)?;
+    let path = directory.join(AUTH_KEY_FILE);
     let identity = path.to_str().context("SSH public key path is not UTF-8")?;
     if identity.contains("${") {
         bail!("SSH public key installation path contains an OpenSSH variable expression");
@@ -274,6 +351,126 @@ fn prepare_ssh_auth_key(
     let config = if use_ssh_config { "" } else { " -F /dev/null" };
     let command = format!("ssh{config} -o IdentitiesOnly=yes -i '{identity}'");
     Ok((key, path, command))
+}
+
+fn repository_ssh_dir() -> Result<PathBuf> {
+    let output = run_git(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    if !output.status.success() {
+        return Err(git_failure("locate", "git-common-dir", &output));
+    }
+    let git_dir = String::from_utf8(output.stdout).context("Git returned a non-UTF-8 directory")?;
+    Ok(PathBuf::from(git_dir.strip_suffix('\n').unwrap_or(&git_dir)).join("ssh"))
+}
+
+fn validate_ssh_public_key(file: &NamedTempFile, label: &str) -> Result<()> {
+    let status = Command::new("ssh-keygen")
+        .args(["-lf", "-"])
+        .stdin(file.reopen().context("could not reopen SSH public key")?)
+        .output()
+        .context("could not run ssh-keygen to validate the SSH public key")?
+        .status;
+    if !status.success() {
+        bail!("{label} is not a valid OpenSSH public key");
+    }
+    Ok(())
+}
+
+fn inline_signing_key(key: &str) -> Option<&str> {
+    let key = key.trim();
+    let public_key = key.strip_prefix("key::").unwrap_or(key);
+    public_key
+        .split_once(char::is_whitespace)
+        .filter(|(kind, _)| {
+            SSH_KEY_PREFIXES
+                .iter()
+                .any(|prefix| kind.starts_with(prefix))
+        })
+        .map(|_| public_key)
+}
+
+fn signing_config_value(key: &str) -> std::borrow::Cow<'_, str> {
+    match inline_signing_key(key) {
+        Some(public_key) => format!("key::{public_key}").into(),
+        None => key.into(),
+    }
+}
+
+fn prepare_allowed_signers(profile: &Profile) -> Result<Option<(NamedTempFile, PathBuf, String)>> {
+    let Some(public_key) = profile.signing_key.as_deref().and_then(inline_signing_key) else {
+        return Ok(None);
+    };
+    let configured = allowed_signers_file()?;
+    let directory = repository_ssh_dir()?;
+    let path = directory.join("g-allowed-signers");
+    let absolute = path.to_str().context("allowed signers path is not UTF-8")?;
+    let relative = ".git/ssh/g-allowed-signers";
+    let root = run_git(&["rev-parse", "--show-toplevel"])?;
+    let ordinary_repository = root.status.success()
+        && std::str::from_utf8(&root.stdout)
+            .ok()
+            .and_then(|root| root.strip_suffix('\n'))
+            .is_some_and(|root| PathBuf::from(root).join(relative) == path);
+    let value = if ordinary_repository {
+        relative
+    } else {
+        absolute
+    };
+    let local = get_all(ConfigScope::Local, ALLOWED_SIGNERS)?;
+    let managed = get_all(ConfigScope::Local, MANAGED_SIGNERS)?;
+    if let Some(configured) = configured.as_deref() {
+        let recognized = configured == absolute
+            || configured == relative && (ordinary_repository || managed == [relative]);
+        if !recognized || local != [configured] {
+            return Ok(None);
+        }
+    } else if !local.is_empty() {
+        return Ok(None);
+    }
+    let value = value.to_owned();
+    let email = profile.email.as_str();
+    if email.starts_with('#')
+        || email
+            .chars()
+            .any(|ch| ch.is_whitespace() || ch.is_control() || ",*!?\"\\".contains(ch))
+    {
+        bail!("Git author email must be a literal SSH allowed signers principal");
+    }
+    let mut fields = public_key.split_whitespace();
+    let (Some(kind), Some(encoded)) = (fields.next(), fields.next()) else {
+        bail!("signing key is not an OpenSSH public key");
+    };
+    if public_key.lines().count() != 1
+        || !encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"+/=".contains(&byte))
+    {
+        bail!("signing key is not an OpenSSH public key");
+    }
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("could not create {}", directory.display()))?;
+    let mut key = NamedTempFile::new_in(&directory).context("could not stage SSH signing key")?;
+    writeln!(key, "{kind} {encoded}").context("could not write SSH signing key")?;
+    validate_ssh_public_key(&key, "signing key")?;
+
+    let entry = format!("{email} {kind} {encoded}");
+    let mut contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(error).with_context(|| format!("could not read {}", path.display()));
+        }
+    };
+    if !contents.lines().any(|line| line == entry) {
+        if !contents.is_empty() && !contents.ends_with('\n') {
+            contents.push('\n');
+        }
+        contents.push_str(&entry);
+        contents.push('\n');
+    }
+    let mut file = NamedTempFile::new_in(&directory).context("could not stage allowed signers")?;
+    file.write_all(contents.as_bytes())
+        .context("could not write allowed signers")?;
+    Ok(Some((file, path, value)))
 }
 
 fn config_scope() -> Result<ConfigScope> {
@@ -314,7 +511,7 @@ fn apply(scope: ConfigScope, profile: &Profile) -> Result<()> {
     replace(scope, "user.email", &profile.email)?;
     match &profile.signing_key {
         Some(key) => {
-            replace(scope, "user.signingkey", key)?;
+            replace(scope, "user.signingkey", &signing_config_value(key))?;
             replace(scope, "commit.gpgsign", "true")?;
             replace(scope, "gpg.format", signing_format(key))?;
         }
@@ -401,10 +598,15 @@ fn remote_updates(scope: ConfigScope, ssh_host: Option<&str>) -> Result<Vec<Remo
     let names = String::from_utf8(output.stdout).context("Git returned non-UTF-8 remote names")?;
     let mut updates = Vec::new();
     for name in names.lines() {
+        // Git config keys are case-insensitive and accept fewer characters than remote names.
+        let mut encoded_name = String::new();
+        for byte in name.bytes() {
+            write!(encoded_name, "{byte:02x}").expect("writing to a String cannot fail");
+        }
         for suffix in ["url", "pushurl"] {
             let key = format!("remote.{name}.{suffix}");
-            let backup_key = format!("remote.{name}.g-original-{suffix}");
-            let applied_key = format!("remote.{name}.g-applied-{suffix}");
+            let backup_key = format!("g.remote-{encoded_name}-original-{suffix}");
+            let applied_key = format!("g.remote-{encoded_name}-applied-{suffix}");
             let backup = get_all(scope, &backup_key)?;
             let applied = get_all(scope, &applied_key)?;
             let values = get_all(scope, &key)?;
@@ -502,12 +704,15 @@ fn read_identity_at(scope: ConfigScope) -> Result<GitIdentity> {
 
 /// Effective `gpg.ssh.allowedSignersFile` across all scopes, if any.
 pub fn allowed_signers_file() -> Result<Option<String>> {
-    let output = run_git(&["config", "--get", "gpg.ssh.allowedSignersFile"])?;
+    let output = run_git(&["config", "--get", ALLOWED_SIGNERS])?;
     if output.status.success() {
         let value = String::from_utf8(output.stdout).context("Git returned non-UTF-8 output")?;
-        Ok(Some(value.trim().to_owned()).filter(|value| !value.is_empty()))
-    } else {
+        Ok(Some(value.strip_suffix('\n').unwrap_or(&value).to_owned())
+            .filter(|value| !value.is_empty()))
+    } else if output.status.code() == Some(1) {
         Ok(None)
+    } else {
+        Err(git_failure("read", ALLOWED_SIGNERS, &output))
     }
 }
 

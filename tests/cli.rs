@@ -290,6 +290,10 @@ fn switches_ssh_auth_keys_and_restores_the_previous_command() {
         assert_success(&context.g(&["edit", profile, "--ssh-auth-key", &ssh_auth_key]));
         assert_success(&context.g(&["use", profile]));
         assert_eq!(fs::read_to_string(&installed).unwrap(), expected);
+        assert_eq!(
+            context.git_value("g.managedSshAuthKeyFile").as_deref(),
+            Some("ssh/g-auth.pub")
+        );
         let command = context.git_value("core.sshCommand").unwrap();
         let config = Command::new("sh")
             .args(["-c", &format!("{command} -G git@github.com")])
@@ -323,12 +327,16 @@ fn switches_ssh_auth_keys_and_restores_the_previous_command() {
         context.git_value("core.sshCommand").as_deref(),
         Some(previous)
     );
+    assert!(!installed.exists());
+    assert_eq!(context.git_value("g.managedSshAuthKeyFile"), None);
     assert_success(&context.g(&["use", "work"]));
     assert_success(&context.g(&["unuse"]));
     assert_eq!(
         context.git_value("core.sshCommand").as_deref(),
         Some(previous)
     );
+    assert!(!installed.exists());
+    assert_eq!(context.git_value("g.managedSshAuthKeyFile"), None);
 }
 
 #[test]
@@ -369,6 +377,109 @@ fn use_from_home_applies_profile_globally() {
         context.global_git_value("user.email").as_deref(),
         Some("work@example.com")
     );
+}
+
+#[test]
+fn inline_ssh_signing_keys_accumulate_in_repository_allowed_signers() {
+    let context = TestContext::new(true);
+    let mut expected = String::new();
+    for profile in ["personal", "work"] {
+        let email = format!("{profile}@example.com");
+        let private_key = context.home.path().join(profile);
+        assert_success(
+            &Command::new("ssh-keygen")
+                .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+                .arg(&private_key)
+                .output()
+                .unwrap(),
+        );
+        let public_key = fs::read_to_string(private_key.with_extension("pub")).unwrap();
+        let public_key = public_key.trim();
+        let bare_key = public_key
+            .split_whitespace()
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(" ");
+        expected.push_str(&format!("{email} {bare_key}\n"));
+        add(&context, profile, profile, &email);
+        assert_success(&context.g(&["edit", profile, "--signing-key", public_key]));
+        assert_success(&context.g(&["use", profile]));
+        assert_eq!(
+            context.git_value("user.signingkey"),
+            Some(format!("key::{public_key}"))
+        );
+        let path = context.git_value("gpg.ssh.allowedSignersFile").unwrap();
+        assert_eq!(path, ".git/ssh/g-allowed-signers");
+        assert_eq!(
+            context.git_value("g.managedAllowedSignersFile").as_deref(),
+            Some(path.as_str())
+        );
+        assert_eq!(
+            fs::read_to_string(context.repository.path().join(path)).unwrap(),
+            expected
+        );
+        context.git(&[
+            "-c",
+            &format!("user.signingkey={}", private_key.display()),
+            "commit",
+            "--allow-empty",
+            "-m",
+            profile,
+        ]);
+    }
+    assert_success(&context.g(&["use", "personal"]));
+    let path = context.git_value("gpg.ssh.allowedSignersFile").unwrap();
+    let file = context.repository.path().join(path);
+    assert_eq!(fs::read_to_string(&file).unwrap(), expected);
+    context.git(&["verify-commit", "HEAD", "HEAD^"]);
+    let worktree = context.home.path().join("linked");
+    context.git(&["worktree", "add", "--detach", worktree.to_str().unwrap()]);
+    assert_success(&context.g_in(&worktree, &["use", "work"]));
+    let absolute = file.canonicalize().unwrap();
+    assert_eq!(
+        context.git_value("gpg.ssh.allowedSignersFile").as_deref(),
+        absolute.to_str()
+    );
+    assert_success(&context.g(&["use", "personal"]));
+    assert_eq!(
+        context.git_value("gpg.ssh.allowedSignersFile").as_deref(),
+        Some(".git/ssh/g-allowed-signers")
+    );
+    assert_success(&context.g(&["unuse"]));
+    assert_eq!(context.git_value("gpg.ssh.allowedSignersFile"), None);
+    assert_eq!(context.git_value("g.managedAllowedSignersFile"), None);
+    assert_eq!(fs::read_to_string(&file).unwrap(), expected);
+
+    // Migrate the previous absolute-path configuration on the next application.
+    context.git(&[
+        "config",
+        "--local",
+        "gpg.ssh.allowedSignersFile",
+        file.canonicalize().unwrap().to_str().unwrap(),
+    ]);
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_value("gpg.ssh.allowedSignersFile").as_deref(),
+        Some(".git/ssh/g-allowed-signers")
+    );
+
+    context.git(&[
+        "config",
+        "--local",
+        "gpg.ssh.allowedSignersFile",
+        "custom-signers",
+    ]);
+    assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_value("gpg.ssh.allowedSignersFile").as_deref(),
+        Some("custom-signers")
+    );
+    assert_success(&context.g(&["unuse"]));
+    assert_eq!(
+        context.git_value("gpg.ssh.allowedSignersFile").as_deref(),
+        Some("custom-signers")
+    );
+    assert_eq!(context.git_value("g.managedAllowedSignersFile"), None);
 }
 
 #[test]
@@ -461,6 +572,19 @@ fn use_rewrites_all_ssh_remote_urls() {
     ]));
 
     assert_success(&context.g(&["use", "work"]));
+    assert_eq!(
+        context.git_values("g.remote-6f726967696e-original-url"),
+        vec!["git@github.com:owner/project.git"]
+    );
+    assert_eq!(
+        context.git_values("g.remote-6f726967696e-applied-url"),
+        vec!["git@github-work:owner/project.git"]
+    );
+    assert!(
+        context
+            .git_values("remote.origin.g-original-url")
+            .is_empty()
+    );
 
     assert_eq!(
         context.git_values("remote.origin.url"),
@@ -499,12 +623,12 @@ fn use_rewrites_all_ssh_remote_urls() {
     );
     assert!(
         context
-            .git_values("remote.origin.g-original-url")
+            .git_values("g.remote-6f726967696e-original-url")
             .is_empty()
     );
     assert!(
         context
-            .git_values("remote.origin.g-applied-pushurl")
+            .git_values("g.remote-6f726967696e-applied-pushurl")
             .is_empty()
     );
 
@@ -516,12 +640,30 @@ fn use_rewrites_all_ssh_remote_urls() {
         "origin",
         "git@github.com:new/project.git",
     ]);
-    assert_success(&context.g(&["edit", "work", "--no-ssh-host"]));
-    assert_success(&context.g(&["use", "work"]));
+    assert_success(&context.g(&["unuse"]));
     assert_eq!(
         context.git_values("remote.origin.url"),
         vec!["git@github.com:new/project.git"]
     );
+    assert_eq!(
+        context.git_values("remote.origin.pushurl"),
+        vec![
+            "ssh://git@gitlab.com:2222/group/project.git",
+            "git@github.com:owner/project-push.git"
+        ]
+    );
+    for key in [
+        "original-url",
+        "applied-url",
+        "original-pushurl",
+        "applied-pushurl",
+    ] {
+        assert!(
+            context
+                .git_values(&format!("g.remote-6f726967696e-{key}"))
+                .is_empty()
+        );
+    }
 }
 
 #[test]
@@ -690,6 +832,60 @@ fn unuse_removes_identity_and_signing_keys() {
         assert_eq!(context.git_value(key), None, "{key}");
     }
     assert_eq!(stdout(&context.g(&["info"])), "unmanaged\n");
+}
+
+#[test]
+fn unuse_restores_identity_from_before_the_first_profile() {
+    let context = TestContext::new(true);
+    let previous = [
+        ("user.name", "Original User"),
+        ("user.email", "original@example.com"),
+        ("user.signingkey", "0123ABCD"),
+        ("commit.gpgsign", "false"),
+        ("gpg.format", "openpgp"),
+    ];
+    for (key, value) in previous {
+        context.git(&["config", "--local", key, value]);
+    }
+    assert_success(&context.g(&["unuse"]));
+    assert_eq!(
+        context.git_value("user.name").as_deref(),
+        Some("Original User")
+    );
+    context.git(&[
+        "config",
+        "--local",
+        "--add",
+        "user.email",
+        "second@example.com",
+    ]);
+    for profile in ["work", "personal"] {
+        add(&context, profile, profile, "profile@example.com");
+        assert_success(&context.g(&["use", profile]));
+    }
+    assert_success(&context.g(&["unuse"]));
+    for (key, value) in previous {
+        if key != "user.email" {
+            assert_eq!(context.git_value(key).as_deref(), Some(value), "{key}");
+        }
+    }
+    let emails = Command::new("git")
+        .args(["config", "--local", "--get-all", "user.email"])
+        .current_dir(context.repository.path())
+        .output()
+        .unwrap();
+    assert_success(&emails);
+    assert_eq!(
+        stdout(&emails),
+        "original@example.com\nsecond@example.com\n"
+    );
+    assert_eq!(context.git_value("g.identityManaged"), None);
+    assert_eq!(context.git_value("g.previousUserName"), None);
+    assert_success(&context.g(&["unuse"]));
+    assert_eq!(
+        context.git_value("user.name").as_deref(),
+        Some("Original User")
+    );
 }
 
 #[test]

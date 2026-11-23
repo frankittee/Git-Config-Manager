@@ -58,12 +58,14 @@ g unuse
 
 - `g use` sets `user.name` and `user.email`. With a signing key it also sets `user.signingkey`, `commit.gpgsign=true`, and `gpg.format` (`openpgp` for hex key IDs, `ssh` otherwise); without one it removes those three keys.
 - With an `ssh_host`, `g use` rewrites SSH fetch and push URLs of every remote in a repository to go through that alias. HTTPS and local URLs are left alone. Global scope never rewrites remotes.
-- To restore the original remote URLs after removing a profile's alias, run `g edit <profile> --no-ssh-host` followed by `g use <profile>`. This uses backups recorded by earlier rewrites in the repository's Git config.
-- With a `ssh_auth_key`, `g use` requires repository scope, copies the public key into `.git/ssh/g-auth.pub`, and sets `core.sshCommand` for both SSH push and fetch. OpenSSH skips its config files unless an `ssh_host` is configured. Applying a profile without an SSH authentication key or running `g unuse` restores the former SSH command.
+- To restore the original remote URLs after removing a profile's alias, run `g edit <profile> --no-ssh-host` followed by `g use <profile>`. This uses backups recorded by earlier rewrites in the local Git configuration’s `[g]` section.
+- With a `ssh_auth_key`, `g use` requires repository scope, copies the public key into `.git/ssh/g-auth.pub`, and sets `core.sshCommand` for both SSH push and fetch. OpenSSH skips its config files unless an `ssh_host` is configured. Applying a profile without an SSH authentication key or running `g unuse` restores the former SSH command and removes the managed public key copy.
 - `g info` prints the matching profile name, or `unmanaged` plus the current values. `g info --short` prints only the name and never fails, which suits shell prompts.
 - `g doctor` checks every saved profile for a missing SSH signing key file, an undeclared `ssh_host` alias, and an unset `gpg.ssh.allowedSignersFile` (warning only). It exits 1 when any error is found.
-- `g unuse` unsets the five identity keys in the current scope and prints which file changed, or says nothing needed removing. It does not undo remote URL rewrites; use `g use <other-profile>` to rewrite them to another alias.
+- `g unuse` restores the five managed identity keys from the `[g]` backup in the current scope and prints which file changed, or says nothing needed removing. It also restores managed fetch and push URL lists that still match the last rewrite, preserves manually changed lists, and clears the remote backup records.
 - Writes are rolled back automatically if any step fails.
+
+- In a repository, `g use` with an inline SSH signing public key adds the profile email and key to the managed `.git/ssh/g-allowed-signers` file and sets `gpg.ssh.allowedSignersFile` locally. It uses a relative path in ordinary repositories and an absolute path with linked worktrees or separate Git directories. `g unuse` clears the managed setting recorded in `[g]`, preserves the signer history on disk, and respects custom configuration.
 
 ## Import and export
 

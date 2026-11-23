@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.5.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.4.0..v1.5.0) - 2026-11-23
+
+#### Features
+- Complete saved profiles for g use - ([fa0d38c](https://github.com/frankittee/Git-Config-Manager/commit/fa0d38c2bfabe1a963273b591eeecadef69e446d)) - frankittee
+
+#### Bug Fixes
+- Restore Git settings after profile use - ([be70780](https://github.com/frankittee/Git-Config-Manager/commit/be70780e13ebeffccdd6b82286c4f89e17ef1265)) - frankittee
+
+#### Refactoring
+- Simplify Git config helpers - ([cdfb243](https://github.com/frankittee/Git-Config-Manager/commit/cdfb2431c516f5b48ebd5449af4e7353cc482fdd)) - frankittee
+
+#### Documentation
+- Clarify profile completion trigger - ([9954efe](https://github.com/frankittee/Git-Config-Manager/commit/9954efe5de53f9a00ee7baa972da247d07090f62)) - frankittee
+
 ## [v1.4.0](https://github.com/frankittee/Git-Config-Manager/compare/v1.3.0..v1.4.0) - 2026-11-18
 
 #### Features
